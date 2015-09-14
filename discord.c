@@ -41,7 +41,17 @@ static void discord_init(account_t *acct) {
 }
 
 static void discord_logout(struct im_connection *ic) {
+  struct discord_data *dd = ic->proto_data;
+
   g_print("%s\n", __func__);
+  if (dd->token != NULL) {
+    g_free(dd->token);
+  }
+}
+
+static void discord_me_cb(struct http_request *req) {
+  g_print("============================\nstatus=%d\n", req->status_code);
+  g_print("\nrh=%s\nrb=%s\n", req->reply_headers, req->reply_body);
 }
 
 static void discord_login_cb(struct http_request *req) {
@@ -58,6 +68,20 @@ static void discord_login_cb(struct http_request *req) {
     struct discord_data *dd = ic->proto_data;
     dd->token = json_o_strdup(js, "token");
     g_print("TOKEN: %s\n", dd->token);
+
+    // TODO: Remove this debug crap
+    GString *request = g_string_new("");
+    g_string_printf(request, "GET /api/users/@me HTTP/1.1\r\n"
+                    "Host: %s\r\n"
+                    "User-Agent: Bitlbee-Discord\r\n"
+                    "Content-Type: application/json\r\n"
+                    "authorization: %s\r\n\r\n",
+                    DISCORD_HOST,
+                    dd->token);
+
+    g_print("Sending req:\nxxxxxxxxxx\n%s\nxxxxxxxxxx\n", request->str);
+    (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, discord_me_cb,
+                          ic);
   } else {
     JSON_O_FOREACH(js, k, v){
       if (v->type != json_array) {
