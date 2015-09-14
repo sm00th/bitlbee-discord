@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS+=`pkg-config --cflags bitlbee` -fPIC
+CFLAGS+=`pkg-config --cflags bitlbee` -fPIC -Wall
 LDFLAGS+=-shared
 
 TARGET=discord.so
@@ -7,7 +7,7 @@ TARGET=discord.so
 $(TARGET): discord.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-install:
+install: $(TARGET)
 	install -m=755 $(TARGET) /usr/lib64/bitlbee
 
 clean:

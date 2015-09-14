@@ -18,38 +18,80 @@
 #include <bitlbee/bitlbee.h>
 #include <bitlbee/http_client.h>
 #include <bitlbee/json.h>
+#include <bitlbee/json_util.h>
 
 #define DISCORD_URL "http://discordapp.com/api"
 #define DISCORD_HOST "discordapp.com"
 
+struct discord_data {
+  char *token;
+};
+
 static void discord_init(account_t *acct) {
-  set_t *s;
+  //set_t *s;
 
   g_print("%s\n", __func__);
-  s = set_add(&acct->set, "token", NULL, NULL, acct);
-  s->flags = SET_NULL_OK | SET_HIDDEN | SET_PASSWORD;
+  //s = set_add(&acct->set, "token", NULL, NULL, acct);
+  //s->flags = SET_NULL_OK | SET_HIDDEN | SET_PASSWORD;
 
-  s = set_add(&acct->set, "uid", NULL, NULL, acct);
-  s->flags = SET_NULL_OK | SET_HIDDEN;
+  //s = set_add(&acct->set, "uid", NULL, NULL, acct);
+  //s->flags = SET_NULL_OK | SET_HIDDEN;
 
-  set_add(&acct->set, "show_unread", "true", set_eval_bool, acct);
+  //set_add(&acct->set, "show_unread", "true", set_eval_bool, acct);
+}
+
+static void discord_logout(struct im_connection *ic) {
+  g_print("%s\n", __func__);
+}
+
+static void discord_login_cb(struct http_request *req) {
+  struct im_connection *ic = req->data;
+  g_print("============================\nstatus=%d\n", req->status_code);
+  g_print("\nrh=%s\nrb=%s\n", req->reply_headers, req->reply_body);
+
+  json_value *js = json_parse(req->reply_body, req->body_size);
+  if (!js || js->type != json_object) {
+    imcb_error(ic, "Failed to parse json reply while logging in");
+    imc_logout(ic, TRUE);
+  }
+  if (req->status_code == 200) {
+    struct discord_data *dd = ic->proto_data;
+    dd->token = json_o_strdup(js, "token");
+    g_print("TOKEN: %s\n", dd->token);
+  } else {
+    JSON_O_FOREACH(js, k, v){
+      if (v->type != json_array) {
+        continue;
+      }
+
+      int i;
+      GString *err = g_string_new("");
+      g_string_printf(err, "%s:", k);
+      for (i = 0; i < v->u.array.length; i++) {
+        if(v->u.array.values[i]->type == json_string) {
+          g_string_append_printf(err, " %s",
+                                 v->u.array.values[i]->u.string.ptr);
+        }
+      }
+      imcb_error(ic, err->str);
+      g_string_free(err, TRUE);
+      imc_logout(ic, FALSE);
+    }
+  }
 }
 
 static void discord_login(account_t *acc) {
-  /*
-   * POST request
-   * > { "email" : "xxx@xxx.xxx", "password" : "xxx" }
-   * < token
-   */
+  struct im_connection *ic = imcb_new(acc);
   GString *request = g_string_new("");
   GString *jlogin = g_string_new("");
 
+  ic->proto_data = g_new0(struct discord_data, 1);
   g_print("%s\n", __func__);
-  g_string_printf(request, "{\"email\":\"%s\",\"password\",\"%s\"}",
-                  "login",
-                  "password");
+  g_string_printf(jlogin, "{\"email\":\"%s\",\"password\":\"%s\"}",
+                  acc->user,
+                  acc->pass);
 
-  g_string_printf(request, "POST api/auth/login HTTP/1.1\r\n"
+  g_string_printf(request, "POST /api/auth/login HTTP/1.1\r\n"
                   "Host: %s\r\n"
                   "User-Agent: Bitlbee-Discord\r\n"
                   "Content-Type: application/json\r\n"
@@ -59,7 +101,9 @@ static void discord_login(account_t *acc) {
                   jlogin->len,
                   jlogin->str);
 
-  (void) http_dorequest(DISCORD_HOST, 80, 1, request->str, NULL, NULL);
+  g_print("Sending req:\nxxxxxxxxxx\n%s\nxxxxxxxxxx\n", request->str);
+  (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, discord_login_cb,
+                       acc->ic);
 
   g_string_free(request, TRUE);
 }
@@ -72,8 +116,8 @@ G_MODULE_EXPORT void init_plugin(void)
     .name = "discord",
     .init = discord_init,
     .login = discord_login,
-    /*.logout = fb_logout,
-    .buddy_msg = fb_buddy_msg,
+    .logout = discord_logout,
+    /*.buddy_msg = fb_buddy_msg,
     .send_typing = fb_send_typing,
     .add_buddy = fb_add_buddy,
     .remove_buddy = fb_remove_buddy,
