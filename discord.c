@@ -142,6 +142,7 @@ static void discord_login(account_t *acc) {
   (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, discord_login_cb,
                        acc->ic);
 
+  g_string_free(jlogin, TRUE);
   g_string_free(request, TRUE);
 }
 
