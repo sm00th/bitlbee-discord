@@ -28,6 +28,9 @@ struct discord_data {
   char *id;
 };
 
+static void discord_http_get(struct im_connection *ic, const char *api_path,
+                             http_input_function cb_func);
+
 static void discord_init(account_t *acct) {
   //set_t *s;
 
@@ -91,19 +94,7 @@ static void discord_login_cb(struct http_request *req) {
     dd->token = json_o_strdup(js, "token");
     g_print("TOKEN: %s\n", dd->token);
 
-    // TODO: Remove this debug crap
-    GString *request = g_string_new("");
-    g_string_printf(request, "GET /api/users/@me HTTP/1.1\r\n"
-                    "Host: %s\r\n"
-                    "User-Agent: Bitlbee-Discord\r\n"
-                    "Content-Type: application/json\r\n"
-                    "authorization: %s\r\n\r\n",
-                    DISCORD_HOST,
-                    dd->token);
-
-    g_print("Sending req:\nxxxxxxxxxx\n%s\nxxxxxxxxxx\n", request->str);
-    (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, discord_me_cb,
-                          ic);
+    discord_http_get(ic, "users/@me", discord_me_cb);
   } else {
     JSON_O_FOREACH(js, k, v){
       if (v->type != json_array) {
@@ -147,7 +138,7 @@ static void discord_login(account_t *acc) {
                   jlogin->len,
                   jlogin->str);
 
-  g_print("Sending req:\nxxxxxxxxxx\n%s\nxxxxxxxxxx\n", request->str);
+  g_print("Sending req:\n----------\n%s\n----------\n", request->str);
   (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, discord_login_cb,
                        acc->ic);
 
@@ -177,4 +168,23 @@ G_MODULE_EXPORT void init_plugin(void)
   g_print("%s\n", __func__);
   dpp = g_memdup(&pp, sizeof pp);
   register_protocol(dpp);
+}
+
+static void discord_http_get(struct im_connection *ic, const char *api_path,
+                             http_input_function cb_func) {
+  struct discord_data *dd = ic->proto_data;
+  GString *request = g_string_new("");
+  g_string_printf(request, "GET /api/%s HTTP/1.1\r\n"
+                  "Host: %s\r\n"
+                  "User-Agent: Bitlbee-Discord\r\n"
+                  "Content-Type: application/json\r\n"
+                  "authorization: %s\r\n\r\n",
+                  api_path,
+                  DISCORD_HOST,
+                  dd->token);
+
+  g_print("Sending req:\n----------\n%s\n----------\n", request->str);
+  (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, cb_func,
+                        ic);
+  g_string_free(request, TRUE);
 }
