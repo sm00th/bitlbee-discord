@@ -25,6 +25,7 @@
 
 struct discord_data {
   char *token;
+  char *id;
 };
 
 static void discord_init(account_t *acct) {
@@ -47,11 +48,32 @@ static void discord_logout(struct im_connection *ic) {
   if (dd->token != NULL) {
     g_free(dd->token);
   }
+
+  if (dd->id != NULL) {
+    g_free(dd->id);
+  }
+
+  g_free(dd);
 }
 
 static void discord_me_cb(struct http_request *req) {
+  struct im_connection *ic = req->data;
   g_print("============================\nstatus=%d\n", req->status_code);
   g_print("\nrh=%s\nrb=%s\n", req->reply_headers, req->reply_body);
+
+  if (req->status_code == 200) {
+    json_value *js = json_parse(req->reply_body, req->body_size);
+    if (!js || js->type != json_object) {
+      imcb_error(ic, "Failed to parse json reply.");
+      imc_logout(ic, TRUE);
+    }
+    struct discord_data *dd = ic->proto_data;
+    dd->id = json_o_strdup(js, "id");
+    g_print("ID: %s\n", dd->id);
+  } else {
+    imcb_error(ic, "Failed to get info about self.");
+    imc_logout(ic, TRUE);
+  }
 }
 
 static void discord_login_cb(struct http_request *req) {
@@ -61,7 +83,7 @@ static void discord_login_cb(struct http_request *req) {
 
   json_value *js = json_parse(req->reply_body, req->body_size);
   if (!js || js->type != json_object) {
-    imcb_error(ic, "Failed to parse json reply while logging in");
+    imcb_error(ic, "Failed to parse json reply.");
     imc_logout(ic, TRUE);
   }
   if (req->status_code == 200) {
