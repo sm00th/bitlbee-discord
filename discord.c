@@ -76,12 +76,14 @@ static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
           json_o_str(cinfo, "last_message_id"));
 
   if (g_strcmp0(json_o_str(cinfo, "type"), "text") == 0) {
+    char *topic;
     GSList *l;
     // FIXME: save it to proto data, cleanup on logout
 
-    // TODO: server/channel?
+    topic = g_strdup_printf("%s/%s", sinfo->name, json_o_str(cinfo, "name"));
     struct groupchat *gc = imcb_chat_new(ic, json_o_str(cinfo, "name"));
     imcb_chat_name_hint(gc, json_o_str(cinfo, "name"));
+    g_free(topic);
 
     for (l = sinfo->users; l; l = l->next) {
       bee_user_t *bu = l->data;
