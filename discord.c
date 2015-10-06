@@ -217,6 +217,9 @@ static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
     ci->gc = gc;
     ci->id = json_o_strdup(cinfo, "id");
     ci->sinfo = sinfo;
+
+    gc->data = ci;
+
     sinfo->channels = g_slist_prepend(sinfo->channels, ci);
   }
 }
@@ -448,6 +451,33 @@ static gboolean discord_is_self(struct im_connection *ic, const char *who) {
   return !g_strcmp0(dd->uname, who);
 }
 
+static void discord_chat_msg(struct groupchat *gc, char *msg, int flags) {
+  channel_info *cinfo = gc->data;
+  discord_data *dd = cinfo->ic->proto_data;
+  GString *request = g_string_new("");
+  GString *content = g_string_new("");
+
+  g_string_printf(content, "{\"content\":\"%s\"}", msg);
+  g_string_printf(request, "POST /api/channels/%s/messages HTTP/1.1\r\n"
+                  "Host: %s\r\n"
+                  "User-Agent: Bitlbee-Discord\r\n"
+                  "authorization: %s\r\n"
+                  "Content-Type: application/json\r\n"
+                  "Content-Length: %zd\r\n\r\n"
+                  "%s",
+                  cinfo->id,
+                  DISCORD_HOST,
+                  dd->token,
+                  content->len,
+                  content->str);
+
+  //g_print("Sending req:\n----------\n%s\n----------\n", request->str);
+  (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, NULL, cinfo->ic);
+
+  g_string_free(content, TRUE);
+  g_string_free(request, TRUE);
+}
+
 G_MODULE_EXPORT void init_plugin(void)
 {
   struct prpl *dpp;
@@ -456,15 +486,9 @@ G_MODULE_EXPORT void init_plugin(void)
     .name = "discord",
     .login = discord_login,
     .logout = discord_logout,
-    /*.init = discord_init,
-    .buddy_msg = fb_buddy_msg,
+    .chat_msg = discord_chat_msg,
+    /*.buddy_msg = fb_buddy_msg,
     .send_typing = fb_send_typing,
-    .add_buddy = fb_add_buddy,
-    .remove_buddy = fb_remove_buddy,
-    .chat_invite = fb_chat_invite,
-    .chat_leave = fb_chat_leave,
-    .chat_msg = fb_chat_msg,
-    .chat_join = fb_chat_join,
     .chat_topic = fb_chat_topic,*/
     .handle_cmp = g_strcmp0,
     .handle_is_self = discord_is_self
