@@ -37,6 +37,11 @@ typedef struct _server_info {
   struct im_connection *ic;
 } server_info;
 
+typedef struct _cdata {
+  struct im_connection *ic;
+  struct groupchat *gc;
+} cdata;
+
 static void discord_http_get(struct im_connection *ic, const char *api_path,
                              http_input_function cb_func, gpointer data);
 
@@ -67,6 +72,45 @@ static void discord_dump_http_reply(struct http_request *req) {
   g_print("\nrh=%s\nrb=%s\n", req->reply_headers, req->reply_body);
 }
 
+static void discord_chat_msg(struct groupchat *gc, json_value *minfo) {
+  g_print("<%s> %s\n", json_o_str(json_o_get(minfo, "author"), "username"),
+                       json_o_str(minfo, "content"));
+  imcb_chat_msg(gc, json_o_str(json_o_get(minfo, "author"), "username"),
+                (char *)json_o_str(minfo, "content"), 0, 0);
+}
+
+static void discord_messages_cb(struct http_request *req) {
+  cdata *cd = req->data;
+  struct im_connection *ic = cd->ic;
+  struct groupchat *gc = cd->gc;
+  discord_dump_http_reply(req);
+
+  if (req->status_code == 200) {
+    int i;
+    json_value *js = json_parse(req->reply_body, req->body_size);
+    if (!js || js->type != json_array) {
+      imcb_error(ic, "Failed to parse json reply.");
+      imc_logout(ic, TRUE);
+      json_value_free(js);
+      return;
+    }
+
+    for (i = js->u.array.length - 1; i >= 0; i--) {
+      if(js->u.array.values[i]->type == json_object) {
+        json_value *minfo = js->u.array.values[i];
+        discord_chat_msg(gc, minfo);
+      }
+    }
+    json_value_free(js);
+    imcb_connected(ic);
+    g_free(cd);
+  } else {
+    imcb_error(ic, "Failed to get channel info.");
+    imc_logout(ic, TRUE);
+    g_free(cd);
+  }
+}
+
 static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
   struct im_connection *ic = sinfo->ic;
   g_print("cname=%s; cid=%s; ctype=%s; clmid=%s\n",
@@ -94,6 +138,15 @@ static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
 
     imcb_chat_add_buddy(gc, ic->acc->user);
     sinfo->channels = g_slist_prepend(sinfo->channels, gc);
+
+    GString *api_path = g_string_new("");
+    // TODO: limit should be configurable
+    g_string_printf(api_path, "channels/%s/messages?limit=20", json_o_str(cinfo, "id"));
+    cdata *cd = g_new0(cdata, 1);
+    cd->ic = sinfo->ic;
+    cd->gc = gc;
+    discord_http_get(ic, api_path->str, discord_messages_cb, cd);
+    g_string_free(api_path, TRUE);
   }
 }
 
