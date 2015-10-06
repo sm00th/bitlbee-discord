@@ -23,10 +23,18 @@
 #define DISCORD_URL "http://discordapp.com/api"
 #define DISCORD_HOST "discordapp.com"
 
+typedef enum {
+  SERVER_UNKNOWN,
+  SERVER_CONNECTING,
+  SERVER_CONNECTED
+} server_state;
+
 typedef struct _discord_data {
-  char   *token;
-  char   *id;
-  GSList *servers;
+  char     *token;
+  char     *id;
+  char     *uname;
+  GSList   *servers;
+  gint     main_loop_id;
 } discord_data;
 
 typedef struct _server_info {
@@ -35,22 +43,33 @@ typedef struct _server_info {
   GSList               *users;
   GSList               *channels;
   struct im_connection *ic;
+  server_state         state;
 } server_info;
 
-typedef struct _cdata {
+typedef struct _channel_info {
+  char                 *id;
+  guint64              last_msg;
+  struct groupchat     *gc;
   struct im_connection *ic;
-  struct groupchat *gc;
-} cdata;
+  server_info          *sinfo;
+} channel_info;
 
 static void discord_http_get(struct im_connection *ic, const char *api_path,
                              http_input_function cb_func, gpointer data);
+
+static void free_channel_info(channel_info *cinfo) {
+  g_free(cinfo->id);
+  imcb_chat_free(cinfo->gc);
+
+  g_free(cinfo);
+}
 
 static void free_server_info(server_info *sinfo) {
   g_free(sinfo->name);
   g_free(sinfo->id);
 
   g_slist_free(sinfo->users);
-  g_slist_free_full(sinfo->channels, (GDestroyNotify)imcb_chat_free);
+  g_slist_free_full(sinfo->channels, (GDestroyNotify)free_channel_info);
 
   g_free(sinfo);
 }
@@ -58,8 +77,11 @@ static void free_server_info(server_info *sinfo) {
 static void discord_logout(struct im_connection *ic) {
   discord_data *dd = ic->proto_data;
 
+  b_event_remove(dd->main_loop_id);
+
   g_print("%s\n", __func__);
   g_free(dd->token);
+  g_free(dd->uname);
   g_free(dd->id);
 
   g_slist_free_full(dd->servers, (GDestroyNotify)free_server_info);
@@ -72,18 +94,10 @@ static void discord_dump_http_reply(struct http_request *req) {
   g_print("\nrh=%s\nrb=%s\n", req->reply_headers, req->reply_body);
 }
 
-static void discord_chat_msg(struct groupchat *gc, json_value *minfo) {
-  g_print("<%s> %s\n", json_o_str(json_o_get(minfo, "author"), "username"),
-                       json_o_str(minfo, "content"));
-  imcb_chat_msg(gc, json_o_str(json_o_get(minfo, "author"), "username"),
-                (char *)json_o_str(minfo, "content"), 0, 0);
-}
-
 static void discord_messages_cb(struct http_request *req) {
-  cdata *cd = req->data;
-  struct im_connection *ic = cd->ic;
-  struct groupchat *gc = cd->gc;
-  discord_dump_http_reply(req);
+  channel_info *cinfo = req->data;
+  struct im_connection *ic = cinfo->ic;
+  struct groupchat *gc = cinfo->gc;
 
   if (req->status_code == 200) {
     int i;
@@ -96,38 +110,98 @@ static void discord_messages_cb(struct http_request *req) {
     }
 
     for (i = js->u.array.length - 1; i >= 0; i--) {
-      if(js->u.array.values[i]->type == json_object) {
+      if (js->u.array.values[i]->type == json_object) {
         json_value *minfo = js->u.array.values[i];
-        discord_chat_msg(gc, minfo);
+        guint64 msgid = g_ascii_strtoull(json_o_str(minfo, "id"), NULL, 10);
+        if (msgid > cinfo->last_msg) {
+          imcb_chat_msg(gc, json_o_str(json_o_get(minfo, "author"), "username"),
+                        (char *)json_o_str(minfo, "content"), 0, 0);
+          cinfo->last_msg = msgid;
+        }
       }
     }
     json_value_free(js);
-    imcb_connected(ic);
-    g_free(cd);
   } else {
-    imcb_error(ic, "Failed to get channel info.");
-    imc_logout(ic, TRUE);
-    g_free(cd);
+    imcb_error(ic, "Failed to get messages for channel: %s (%d).", gc->title,
+               req->status_code);
+    if (req->status_code == 403) {
+      server_info *sinfo = cinfo->sinfo;
+      sinfo->channels = g_slist_remove(sinfo->channels, cinfo);
+      free_channel_info(cinfo);
+    } else {
+      imc_logout(ic, TRUE);
+    }
+  }
+}
+
+static gboolean discord_main_loop(gpointer data, gint fd,
+                                  b_input_condition cond) {
+  struct im_connection *ic = data;
+  discord_data *dd = ic->proto_data;
+  GSList *l, *s;
+
+  for (s = dd->servers; s; s = s->next) {
+    server_info *sinfo = s->data;
+    for (l = sinfo->channels; l; l = l->next) {
+      channel_info *cinfo = l->data;
+      GString *api_path = g_string_new("");
+      g_string_printf(api_path, "channels/%s/messages", cinfo->id);
+      if (cinfo->last_msg == 0) {
+        // TODO: limit should be configurable
+        g_string_append(api_path, "?limit=20");
+      }
+      discord_http_get(ic, api_path->str, discord_messages_cb, cinfo);
+      g_string_free(api_path, TRUE);
+    }
+  }
+  return TRUE; // TODO: We do want to exit the loop at some point.
+}
+
+static void try_start_loop(struct im_connection *ic) {
+  discord_data *dd = ic->proto_data;
+  gboolean all_connected = TRUE;
+  GSList *l;
+
+  for (l = dd->servers; l; l = l->next) {
+    server_info *sinfo = l->data;
+    if (sinfo->state != SERVER_CONNECTED) {
+      all_connected = FALSE;
+      break;
+    }
+  }
+
+  if (all_connected) {
+    discord_main_loop(ic, -1, 0);
+    imcb_connected(ic);
+
+    // TODO: timeout should be configurable
+    dd->main_loop_id = b_timeout_add(5 * 1000, discord_main_loop, ic);
   }
 }
 
 static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
   struct im_connection *ic = sinfo->ic;
-  g_print("cname=%s; cid=%s; ctype=%s; clmid=%s\n",
+  discord_data *dd = ic->proto_data;
+
+  g_print("cname=%s; cid=%s; ctype=%s; clmid=%s; topic=%s\n",
           json_o_str(cinfo, "name"),
           json_o_str(cinfo, "id"),
           json_o_str(cinfo, "type"),
-          json_o_str(cinfo, "last_message_id"));
+          json_o_str(cinfo, "last_message_id"),
+          json_o_str(cinfo, "topic"));
 
   if (g_strcmp0(json_o_str(cinfo, "type"), "text") == 0) {
-    char *topic;
+    char *title;
+    char *topic = (char *)json_o_str(cinfo, "topic");
     GSList *l;
-    // FIXME: save it to proto data, cleanup on logout
 
-    topic = g_strdup_printf("%s/%s", sinfo->name, json_o_str(cinfo, "name"));
-    struct groupchat *gc = imcb_chat_new(ic, json_o_str(cinfo, "name"));
+    title = g_strdup_printf("%s/%s", sinfo->name, json_o_str(cinfo, "name"));
+    struct groupchat *gc = imcb_chat_new(ic, title);
     imcb_chat_name_hint(gc, json_o_str(cinfo, "name"));
-    g_free(topic);
+    if (topic != NULL) {
+      imcb_chat_topic(gc, "root", topic, 0);
+    }
+    g_free(title);
 
     for (l = sinfo->users; l; l = l->next) {
       bee_user_t *bu = l->data;
@@ -136,24 +210,22 @@ static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
       }
     }
 
-    imcb_chat_add_buddy(gc, ic->acc->user);
-    sinfo->channels = g_slist_prepend(sinfo->channels, gc);
+    imcb_chat_add_buddy(gc, dd->uname);
 
-    GString *api_path = g_string_new("");
-    // TODO: limit should be configurable
-    g_string_printf(api_path, "channels/%s/messages?limit=20", json_o_str(cinfo, "id"));
-    cdata *cd = g_new0(cdata, 1);
-    cd->ic = sinfo->ic;
-    cd->gc = gc;
-    discord_http_get(ic, api_path->str, discord_messages_cb, cd);
-    g_string_free(api_path, TRUE);
+    channel_info *ci = g_new0(channel_info, 1);
+    ci->ic = sinfo->ic;
+    ci->gc = gc;
+    ci->id = json_o_strdup(cinfo, "id");
+    ci->sinfo = sinfo;
+    sinfo->channels = g_slist_prepend(sinfo->channels, ci);
   }
 }
 
 static void discord_channels_cb(struct http_request *req) {
   server_info *sinfo = req->data;
   struct im_connection *ic = sinfo->ic;
-  discord_dump_http_reply(req);
+
+  //discord_dump_http_reply(req);
 
   if (req->status_code == 200) {
     int i;
@@ -166,13 +238,16 @@ static void discord_channels_cb(struct http_request *req) {
     }
 
     for (i = 0; i < js->u.array.length; i++) {
-      if(js->u.array.values[i]->type == json_object) {
+      if (js->u.array.values[i]->type == json_object) {
         json_value *cinfo = js->u.array.values[i];
         discord_add_channel(sinfo, cinfo);
       }
     }
     json_value_free(js);
-    imcb_connected(ic);
+
+    sinfo->state = SERVER_CONNECTED;
+
+    try_start_loop(ic);
   } else {
     imcb_error(ic, "Failed to get channel info.");
     imc_logout(ic, TRUE);
@@ -182,7 +257,8 @@ static void discord_channels_cb(struct http_request *req) {
 static void discord_users_cb(struct http_request *req) {
   server_info *sinfo = req->data;
   struct im_connection *ic = sinfo->ic;
-  discord_dump_http_reply(req);
+
+  //discord_dump_http_reply(req);
 
   if (req->status_code == 200) {
     int i;
@@ -195,7 +271,7 @@ static void discord_users_cb(struct http_request *req) {
     }
 
     for (i = 0; i < js->u.array.length; i++) {
-      if(js->u.array.values[i]->type == json_object) {
+      if (js->u.array.values[i]->type == json_object) {
         json_value *uinfo = json_o_get(js->u.array.values[i], "user");
         const char *name = json_o_str(uinfo, "username");
 
@@ -225,7 +301,8 @@ static void discord_users_cb(struct http_request *req) {
 
 static void discord_servers_cb(struct http_request *req) {
   struct im_connection *ic = req->data;
-  discord_dump_http_reply(req);
+
+  //discord_dump_http_reply(req);
 
   if (req->status_code == 200) {
     int i;
@@ -238,7 +315,7 @@ static void discord_servers_cb(struct http_request *req) {
     }
 
     for (i = 0; i < js->u.array.length; i++) {
-      if(js->u.array.values[i]->type == json_object) {
+      if (js->u.array.values[i]->type == json_object) {
         discord_data *dd = ic->proto_data;
         server_info *sinfo = g_new0(server_info, 1);
         GString *api_path = g_string_new("");
@@ -249,6 +326,7 @@ static void discord_servers_cb(struct http_request *req) {
         sinfo->name = json_o_strdup(ginfo, "name");
         sinfo->id = json_o_strdup(ginfo, "id");
         sinfo->ic = ic;
+        sinfo->state = SERVER_CONNECTING;
 
         g_string_printf(api_path, "guilds/%s/members", json_o_str(ginfo, "id"));
         discord_http_get(ic, api_path->str, discord_users_cb, sinfo);
@@ -266,7 +344,8 @@ static void discord_servers_cb(struct http_request *req) {
 
 static void discord_me_cb(struct http_request *req) {
   struct im_connection *ic = req->data;
-  discord_dump_http_reply(req);
+
+  //discord_dump_http_reply(req);
 
   if (req->status_code == 200) {
     json_value *js = json_parse(req->reply_body, req->body_size);
@@ -280,7 +359,8 @@ static void discord_me_cb(struct http_request *req) {
     GString *api_path = g_string_new("");
 
     dd->id = json_o_strdup(js, "id");
-    g_print("ID: %s\n", dd->id);
+    dd->uname = json_o_strdup(js, "username");
+    g_print("id=%s; uname=%s\n", dd->id, dd->uname);
 
     g_string_printf(api_path, "users/%s/guilds", dd->id);
     discord_http_get(ic, api_path->str, discord_servers_cb, ic);
@@ -295,7 +375,8 @@ static void discord_me_cb(struct http_request *req) {
 
 static void discord_login_cb(struct http_request *req) {
   struct im_connection *ic = req->data;
-  discord_dump_http_reply(req);
+
+  //discord_dump_http_reply(req);
 
   json_value *js = json_parse(req->reply_body, req->body_size);
   if (!js || js->type != json_object) {
@@ -320,7 +401,7 @@ static void discord_login_cb(struct http_request *req) {
       GString *err = g_string_new("");
       g_string_printf(err, "%s:", k);
       for (i = 0; i < v->u.array.length; i++) {
-        if(v->u.array.values[i]->type == json_string) {
+        if (v->u.array.values[i]->type == json_string) {
           g_string_append_printf(err, " %s",
                                  v->u.array.values[i]->u.string.ptr);
         }
@@ -354,12 +435,17 @@ static void discord_login(account_t *acc) {
                   jlogin->len,
                   jlogin->str);
 
-  g_print("Sending req:\n----------\n%s\n----------\n", request->str);
+  //g_print("Sending req:\n----------\n%s\n----------\n", request->str);
   (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, discord_login_cb,
                        acc->ic);
 
   g_string_free(jlogin, TRUE);
   g_string_free(request, TRUE);
+}
+
+static gboolean discord_is_self(struct im_connection *ic, const char *who) {
+  discord_data *dd = ic->proto_data;
+  return !g_strcmp0(dd->uname, who);
 }
 
 G_MODULE_EXPORT void init_plugin(void)
@@ -380,7 +466,8 @@ G_MODULE_EXPORT void init_plugin(void)
     .chat_msg = fb_chat_msg,
     .chat_join = fb_chat_join,
     .chat_topic = fb_chat_topic,*/
-    .handle_cmp = g_strcmp0
+    .handle_cmp = g_strcmp0,
+    .handle_is_self = discord_is_self
   };
   g_print("%s\n", __func__);
   dpp = g_memdup(&pp, sizeof pp);
@@ -400,7 +487,7 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
                   DISCORD_HOST,
                   dd->token);
 
-  g_print("Sending req:\n----------\n%s\n----------\n", request->str);
+  //g_print("Sending req:\n----------\n%s\n----------\n", request->str);
   (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, cb_func,
                         data);
   g_string_free(request, TRUE);
