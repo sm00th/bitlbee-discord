@@ -79,7 +79,6 @@ static void discord_logout(struct im_connection *ic) {
 
   b_event_remove(dd->main_loop_id);
 
-  g_print("%s\n", __func__);
   g_free(dd->token);
   g_free(dd->uname);
   g_free(dd->id);
@@ -183,13 +182,6 @@ static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
   struct im_connection *ic = sinfo->ic;
   discord_data *dd = ic->proto_data;
 
-  g_print("cname=%s; cid=%s; ctype=%s; clmid=%s; topic=%s\n",
-          json_o_str(cinfo, "name"),
-          json_o_str(cinfo, "id"),
-          json_o_str(cinfo, "type"),
-          json_o_str(cinfo, "last_message_id"),
-          json_o_str(cinfo, "topic"));
-
   if (g_strcmp0(json_o_str(cinfo, "type"), "text") == 0) {
     char *title;
     char *topic = (char *)json_o_str(cinfo, "topic");
@@ -278,7 +270,6 @@ static void discord_users_cb(struct http_request *req) {
         json_value *uinfo = json_o_get(js->u.array.values[i], "user");
         const char *name = json_o_str(uinfo, "username");
 
-        g_print("uname=%s\n", name);
         if (name && !bee_user_by_handle(ic->bee, ic, name)) {
           bee_user_t *buser;
           imcb_add_buddy(ic, name, NULL);
@@ -323,8 +314,6 @@ static void discord_servers_cb(struct http_request *req) {
         server_info *sinfo = g_new0(server_info, 1);
         GString *api_path = g_string_new("");
         json_value *ginfo = js->u.array.values[i];
-        g_print("gname=%s; gid=%s\n", json_o_str(ginfo, "name"),
-                                      json_o_str(ginfo, "id"));
 
         sinfo->name = json_o_strdup(ginfo, "name");
         sinfo->id = json_o_strdup(ginfo, "id");
@@ -363,7 +352,6 @@ static void discord_me_cb(struct http_request *req) {
 
     dd->id = json_o_strdup(js, "id");
     dd->uname = json_o_strdup(js, "username");
-    g_print("id=%s; uname=%s\n", dd->id, dd->uname);
 
     g_string_printf(api_path, "users/%s/guilds", dd->id);
     discord_http_get(ic, api_path->str, discord_servers_cb, ic);
@@ -391,7 +379,6 @@ static void discord_login_cb(struct http_request *req) {
   if (req->status_code == 200) {
     discord_data *dd = ic->proto_data;
     dd->token = json_o_strdup(js, "token");
-    g_print("TOKEN: %s\n", dd->token);
 
     discord_http_get(ic, "users/@me", discord_me_cb, ic);
   } else {
@@ -423,7 +410,6 @@ static void discord_login(account_t *acc) {
   GString *jlogin = g_string_new("");
 
   ic->proto_data = g_new0(discord_data, 1);
-  g_print("%s\n", __func__);
   g_string_printf(jlogin, "{\"email\":\"%s\",\"password\":\"%s\"}",
                   acc->user,
                   acc->pass);
@@ -438,7 +424,6 @@ static void discord_login(account_t *acc) {
                   jlogin->len,
                   jlogin->str);
 
-  //g_print("Sending req:\n----------\n%s\n----------\n", request->str);
   (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, discord_login_cb,
                        acc->ic);
 
@@ -470,7 +455,6 @@ static void discord_send_msg(struct im_connection *ic, char *id, char *msg) {
                   content->len,
                   content->str);
 
-  //g_print("Sending req:\n----------\n%s\n----------\n", request->str);
   (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, NULL, NULL);
 
   g_string_free(content, TRUE);
@@ -496,7 +480,6 @@ G_MODULE_EXPORT void init_plugin(void)
     .handle_cmp = g_strcmp0,
     .handle_is_self = discord_is_self
   };
-  g_print("%s\n", __func__);
   dpp = g_memdup(&pp, sizeof pp);
   register_protocol(dpp);
 }
@@ -514,7 +497,6 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
                   DISCORD_HOST,
                   dd->token);
 
-  //g_print("Sending req:\n----------\n%s\n----------\n", request->str);
   (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, cb_func,
                         data);
   g_string_free(request, TRUE);
