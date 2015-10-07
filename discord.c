@@ -194,12 +194,13 @@ static gboolean discord_main_loop(gpointer data, gint fd,
     GString *api_path = g_string_new("");
     g_string_printf(api_path, "channels/%s/messages", cinfo->id);
     if (cinfo->last_msg != 0) {
-      g_string_append_printf(api_path, "?limit=%d", 5 * 3); // polling interval x 3
+      g_string_append_printf(api_path, "?limit=%d",
+                             set_getint(&ic->acc->set, "fetch_interval") * 3);
     }
     discord_http_get(ic, api_path->str, discord_messages_cb, cinfo);
     g_string_free(api_path, TRUE);
   }
-  return TRUE; // TODO: We do want to exit the loop at some point.
+  return TRUE;
 }
 
 static void try_start_loop(struct im_connection *ic) {
@@ -219,8 +220,9 @@ static void try_start_loop(struct im_connection *ic) {
     discord_main_loop(ic, -1, 0);
     imcb_connected(ic);
 
-    // TODO: timeout should be configurable
-    dd->main_loop_id = b_timeout_add(5 * 1000, discord_main_loop, ic);
+    dd->main_loop_id = b_timeout_add(set_getint(&ic->acc->set,
+                                     "fetch_interval") * 1000,
+                                     discord_main_loop, ic);
   }
 }
 
@@ -514,12 +516,12 @@ static void discord_login(account_t *acc) {
                   "Content-Type: application/json\r\n"
                   "Content-Length: %zd\r\n\r\n"
                   "%s",
-                  DISCORD_HOST,
+                  set_getstr(&ic->acc->set, "host"),
                   jlogin->len,
                   jlogin->str);
 
-  (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, discord_login_cb,
-                       acc->ic);
+  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 80, 0,
+                        request->str, discord_login_cb, acc->ic);
 
   g_string_free(jlogin, TRUE);
   g_string_free(request, TRUE);
@@ -530,7 +532,8 @@ static gboolean discord_is_self(struct im_connection *ic, const char *who) {
   return !g_strcmp0(dd->uname, who);
 }
 
-static void discord_send_msg(discord_data *dd, char *id, char *msg) {
+static void discord_send_msg(struct im_connection *ic, char *id, char *msg) {
+  discord_data *dd = ic->proto_data;
   GString *request = g_string_new("");
   GString *content = g_string_new("");
 
@@ -543,12 +546,13 @@ static void discord_send_msg(discord_data *dd, char *id, char *msg) {
                   "Content-Length: %zd\r\n\r\n"
                   "%s",
                   id,
-                  DISCORD_HOST,
+                  set_getstr(&ic->acc->set, "host"),
                   dd->token,
                   content->len,
                   content->str);
 
-  (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, NULL, NULL);
+  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 80, 0,
+                        request->str, NULL, NULL);
 
   g_string_free(content, TRUE);
   g_string_free(request, TRUE);
@@ -557,7 +561,17 @@ static void discord_send_msg(discord_data *dd, char *id, char *msg) {
 static void discord_chat_msg(struct groupchat *gc, char *msg, int flags) {
   channel_info *cinfo = gc->data;
 
-  discord_send_msg(cinfo->to.channel.gc->ic->proto_data, cinfo->id, msg);
+  discord_send_msg(cinfo->to.channel.gc->ic, cinfo->id, msg);
+}
+
+static void discord_init(account_t *acc) {
+  set_t *s;
+
+  s = set_add(&acc->set, "host", DISCORD_HOST, NULL, acc);
+  s->flags |= ACC_SET_OFFLINE_ONLY;
+
+  s = set_add(&acc->set, "fetch_interval", "5", set_eval_int, acc);
+  s->flags |= ACC_SET_OFFLINE_ONLY;
 }
 
 G_MODULE_EXPORT void init_plugin(void)
@@ -566,6 +580,7 @@ G_MODULE_EXPORT void init_plugin(void)
 
   static const struct prpl pp = {
     .name = "discord",
+    .init = discord_init,
     .login = discord_login,
     .logout = discord_logout,
     .chat_msg = discord_chat_msg,
@@ -587,10 +602,10 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
                   "Content-Type: application/json\r\n"
                   "authorization: %s\r\n\r\n",
                   api_path,
-                  DISCORD_HOST,
+                  set_getstr(&ic->acc->set, "host"),
                   dd->token);
 
-  (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, cb_func,
-                        data);
+  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 80, 0,
+                        request->str, cb_func, data);
   g_string_free(request, TRUE);
 }
