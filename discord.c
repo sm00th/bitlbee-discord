@@ -117,6 +117,13 @@ static void discord_dump_http_reply(struct http_request *req) {
   g_print("\nrh=%s\nrb=%s\n", req->reply_headers, req->reply_body);
 }
 
+static void discord_send_msg_cb(struct http_request *req) {
+  struct im_connection *ic = req->data;
+  if (req->status_code != 200) {
+    imcb_error(ic, "Failed to send message (%d).", req->status_code);
+  }
+}
+
 static void discord_messages_cb(struct http_request *req) {
   channel_info *cinfo = req->data;
   struct im_connection *ic;
@@ -552,7 +559,7 @@ static void discord_send_msg(struct im_connection *ic, char *id, char *msg) {
                   content->str);
 
   (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 80, 0,
-                        request->str, NULL, NULL);
+                        request->str, discord_send_msg_cb, ic);
 
   g_string_free(content, TRUE);
   g_string_free(request, TRUE);
@@ -562,6 +569,21 @@ static void discord_chat_msg(struct groupchat *gc, char *msg, int flags) {
   channel_info *cinfo = gc->data;
 
   discord_send_msg(cinfo->to.channel.gc->ic, cinfo->id, msg);
+}
+
+static int discord_buddy_msg(struct im_connection *ic, char *to, char *msg,
+                              int flags) {
+  discord_data *dd = ic->proto_data;
+  GSList *l;
+
+  for (l = dd->channels; l; l = l->next) {
+    channel_info *cinfo = l->data;
+    if (cinfo->is_private && g_strcmp0(cinfo->to.user.handle, to) == 0) {
+      discord_send_msg(ic, cinfo->id, msg);
+    }
+  }
+
+  return 0;
 }
 
 static void discord_init(account_t *acc) {
@@ -584,7 +606,7 @@ G_MODULE_EXPORT void init_plugin(void)
     .login = discord_login,
     .logout = discord_logout,
     .chat_msg = discord_chat_msg,
-    //.buddy_msg = discord_buddy_msg,
+    .buddy_msg = discord_buddy_msg,
     .handle_cmp = g_strcmp0,
     .handle_is_self = discord_is_self
   };
