@@ -259,7 +259,8 @@ static void discord_add_channel(cadd *ca) {
 
   for (l = ca->sinfo->users; l; l = l->next) {
     user_info *uinfo = l->data;
-    if (uinfo->user->ic == ic) {
+    if (uinfo->user->ic == ic &&
+        g_strcmp0(uinfo->user->handle, dd->uname) != 0) {
       imcb_chat_add_buddy(gc, uinfo->user->handle);
     }
   }
