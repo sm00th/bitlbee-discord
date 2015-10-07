@@ -34,6 +34,7 @@ typedef struct _discord_data {
   char     *id;
   char     *uname;
   GSList   *servers;
+  GSList   *channels;
   gint     main_loop_id;
 } discord_data;
 
@@ -41,7 +42,6 @@ typedef struct _server_info {
   char                 *name;
   char                 *id;
   GSList               *users;
-  GSList               *channels;
   struct im_connection *ic;
   server_state         state;
 } server_info;
@@ -49,8 +49,17 @@ typedef struct _server_info {
 typedef struct _channel_info {
   char                 *id;
   guint64              last_msg;
-  struct groupchat     *gc;
-  server_info          *sinfo;
+  union {
+    struct {
+      struct groupchat     *gc;
+      server_info          *sinfo;
+    } channel;
+    struct {
+      char                 *handle;
+      struct im_connection *ic;
+    } user;
+  } to;
+  gboolean             is_private;
 } channel_info;
 
 typedef struct _user_info {
@@ -69,7 +78,13 @@ static void free_user_info(user_info *uinfo) {
 
 static void free_channel_info(channel_info *cinfo) {
   g_free(cinfo->id);
-  imcb_chat_free(cinfo->gc);
+  cinfo->id = NULL;
+
+  if (cinfo->is_private) {
+    g_free(cinfo->to.user.handle);
+  } else {
+    imcb_chat_free(cinfo->to.channel.gc);
+  }
 
   g_free(cinfo);
 }
@@ -79,7 +94,6 @@ static void free_server_info(server_info *sinfo) {
   g_free(sinfo->id);
 
   g_slist_free_full(sinfo->users, (GDestroyNotify)free_user_info);
-  g_slist_free_full(sinfo->channels, (GDestroyNotify)free_channel_info);
 
   g_free(sinfo);
 }
@@ -89,11 +103,12 @@ static void discord_logout(struct im_connection *ic) {
 
   b_event_remove(dd->main_loop_id);
 
+  g_slist_free_full(dd->channels, (GDestroyNotify)free_channel_info);
+  g_slist_free_full(dd->servers, (GDestroyNotify)free_server_info);
+
   g_free(dd->token);
   g_free(dd->uname);
   g_free(dd->id);
-
-  g_slist_free_full(dd->servers, (GDestroyNotify)free_server_info);
 
   g_free(dd);
 }
@@ -105,8 +120,20 @@ static void discord_dump_http_reply(struct http_request *req) {
 
 static void discord_messages_cb(struct http_request *req) {
   channel_info *cinfo = req->data;
-  struct groupchat *gc = cinfo->gc;
-  struct im_connection *ic = gc->ic;
+  struct im_connection *ic;
+  discord_data *dd;
+
+  // Channel got freed, we are exiting, so don't try anything.
+  if (cinfo->id == NULL) {
+    return;
+  }
+
+  if (cinfo->is_private) {
+    ic = cinfo->to.user.ic;
+  } else {
+    ic = cinfo->to.channel.gc->ic;
+  }
+  dd = ic->proto_data;
 
   if (req->status_code == 200) {
     int i;
@@ -123,19 +150,33 @@ static void discord_messages_cb(struct http_request *req) {
         json_value *minfo = js->u.array.values[i];
         guint64 msgid = g_ascii_strtoull(json_o_str(minfo, "id"), NULL, 10);
         if (msgid > cinfo->last_msg) {
-          imcb_chat_msg(gc, json_o_str(json_o_get(minfo, "author"), "username"),
-                        (char *)json_o_str(minfo, "content"), 0, 0);
+          if (cinfo->is_private) {
+            if (!g_strcmp0(json_o_str(json_o_get(minfo, "author"), "username"),
+                           cinfo->to.user.handle)) {
+              imcb_buddy_msg(cinfo->to.user.ic,
+                             cinfo->to.user.handle,
+                             (char *)json_o_str(minfo, "content"), 0, 0);
+            }
+          } else {
+            struct groupchat *gc = cinfo->to.channel.gc;
+            imcb_chat_msg(gc, json_o_str(json_o_get(minfo, "author"), "username"),
+                          (char *)json_o_str(minfo, "content"), 0, 0);
+          }
           cinfo->last_msg = msgid;
         }
       }
     }
     json_value_free(js);
   } else {
-    imcb_error(ic, "Failed to get messages for channel: %s (%d).", gc->title,
-               req->status_code);
+    if (cinfo->is_private) {
+      imcb_error(ic, "Failed to get messages from handle: %s (%d).",
+                 cinfo->to.user.handle, req->status_code);
+    } else {
+      imcb_error(ic, "Failed to get messages from channel: %s (%d).",
+                 cinfo->to.channel.gc->title, req->status_code);
+    }
     if (req->status_code == 403) {
-      server_info *sinfo = cinfo->sinfo;
-      sinfo->channels = g_slist_remove(sinfo->channels, cinfo);
+      dd->channels = g_slist_remove(dd->channels, cinfo);
       free_channel_info(cinfo);
     } else {
       imc_logout(ic, TRUE);
@@ -147,21 +188,18 @@ static gboolean discord_main_loop(gpointer data, gint fd,
                                   b_input_condition cond) {
   struct im_connection *ic = data;
   discord_data *dd = ic->proto_data;
-  GSList *l, *s;
+  GSList *l;
 
-  for (s = dd->servers; s; s = s->next) {
-    server_info *sinfo = s->data;
-    for (l = sinfo->channels; l; l = l->next) {
-      channel_info *cinfo = l->data;
-      GString *api_path = g_string_new("");
-      g_string_printf(api_path, "channels/%s/messages", cinfo->id);
-      if (cinfo->last_msg == 0) {
-        // TODO: limit should be configurable
-        g_string_append(api_path, "?limit=20");
-      }
-      discord_http_get(ic, api_path->str, discord_messages_cb, cinfo);
-      g_string_free(api_path, TRUE);
+  for (l = dd->channels; l; l = l->next) {
+    channel_info *cinfo = l->data;
+    GString *api_path = g_string_new("");
+    g_string_printf(api_path, "channels/%s/messages", cinfo->id);
+    if (cinfo->last_msg == 0) {
+      // TODO: limit should be configurable
+      g_string_append(api_path, "?limit=20");
     }
+    discord_http_get(ic, api_path->str, discord_messages_cb, cinfo);
+    g_string_free(api_path, TRUE);
   }
   return TRUE; // TODO: We do want to exit the loop at some point.
 }
@@ -216,13 +254,14 @@ static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
     imcb_chat_add_buddy(gc, dd->uname);
 
     channel_info *ci = g_new0(channel_info, 1);
-    ci->gc = gc;
+    ci->is_private = FALSE;
+    ci->to.channel.gc = gc;
+    ci->to.channel.sinfo = sinfo;
     ci->id = json_o_strdup(cinfo, "id");
-    ci->sinfo = sinfo;
 
     gc->data = ci;
 
-    sinfo->channels = g_slist_prepend(sinfo->channels, ci);
+    dd->channels = g_slist_prepend(dd->channels, ci);
   }
 }
 
@@ -255,6 +294,41 @@ static void discord_channels_cb(struct http_request *req) {
     try_start_loop(ic);
   } else {
     imcb_error(ic, "Failed to get channel info.");
+    imc_logout(ic, TRUE);
+  }
+}
+
+static void discord_pchans_cb(struct http_request *req) {
+  struct im_connection *ic = req->data;
+  discord_data *dd = ic->proto_data;
+
+  if (req->status_code == 200) {
+    int i;
+    json_value *js = json_parse(req->reply_body, req->body_size);
+    if (!js || js->type != json_array) {
+      imcb_error(ic, "Failed to parse json reply.");
+      imc_logout(ic, TRUE);
+      json_value_free(js);
+      return;
+    }
+
+    for (i = 0; i < js->u.array.length; i++) {
+      if (js->u.array.values[i]->type == json_object) {
+        json_value *cinfo = js->u.array.values[i];
+
+        channel_info *ci = g_new0(channel_info, 1);
+        ci->is_private = TRUE;
+        ci->to.user.handle = json_o_strdup(json_o_get(cinfo, "recipient"),
+                                           "username");
+        ci->id = json_o_strdup(cinfo, "id");
+        ci->to.user.ic = ic;
+
+        dd->channels = g_slist_prepend(dd->channels, ci);
+      }
+    }
+    json_value_free(js);
+  } else {
+    imcb_error(ic, "Failed to get private channel info.");
     imc_logout(ic, TRUE);
   }
 }
@@ -394,6 +468,7 @@ static void discord_login_cb(struct http_request *req) {
     dd->token = json_o_strdup(js, "token");
 
     discord_http_get(ic, "users/@me", discord_me_cb, ic);
+    discord_http_get(ic, "users/@me/channels", discord_pchans_cb, ic);
   } else {
     JSON_O_FOREACH(js, k, v){
       if (v->type != json_array) {
@@ -476,7 +551,7 @@ static void discord_send_msg(discord_data *dd, char *id, char *msg) {
 static void discord_chat_msg(struct groupchat *gc, char *msg, int flags) {
   channel_info *cinfo = gc->data;
 
-  discord_send_msg(cinfo->gc->ic->proto_data, cinfo->id, msg);
+  discord_send_msg(cinfo->to.channel.gc->ic->proto_data, cinfo->id, msg);
 }
 
 G_MODULE_EXPORT void init_plugin(void)
