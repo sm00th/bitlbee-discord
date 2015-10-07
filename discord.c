@@ -20,7 +20,6 @@
 #include <bitlbee/json.h>
 #include <bitlbee/json_util.h>
 
-#define DISCORD_URL "http://discordapp.com/api"
 #define DISCORD_HOST "discordapp.com"
 
 typedef enum {
@@ -194,9 +193,8 @@ static gboolean discord_main_loop(gpointer data, gint fd,
     channel_info *cinfo = l->data;
     GString *api_path = g_string_new("");
     g_string_printf(api_path, "channels/%s/messages", cinfo->id);
-    if (cinfo->last_msg == 0) {
-      // TODO: limit should be configurable
-      g_string_append(api_path, "?limit=20");
+    if (cinfo->last_msg != 0) {
+      g_string_append_printf(api_path, "?limit=%d", 5 * 3); // polling interval x 3
     }
     discord_http_get(ic, api_path->str, discord_messages_cb, cinfo);
     g_string_free(api_path, TRUE);
@@ -233,6 +231,7 @@ static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
   if (g_strcmp0(json_o_str(cinfo, "type"), "text") == 0) {
     char *title;
     char *topic = (char *)json_o_str(cinfo, "topic");
+    char *lmsg = (char *)json_o_str(cinfo, "last_message_id");
     GSList *l;
 
     title = g_strdup_printf("%s/%s", sinfo->name, json_o_str(cinfo, "name"));
@@ -258,6 +257,9 @@ static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
     ci->to.channel.gc = gc;
     ci->to.channel.sinfo = sinfo;
     ci->id = json_o_strdup(cinfo, "id");
+    if (lmsg != NULL) {
+      ci->last_msg = g_ascii_strtoull(lmsg, NULL, 10);
+    }
 
     gc->data = ci;
 
@@ -315,9 +317,13 @@ static void discord_pchans_cb(struct http_request *req) {
     for (i = 0; i < js->u.array.length; i++) {
       if (js->u.array.values[i]->type == json_object) {
         json_value *cinfo = js->u.array.values[i];
+        char *lmsg = (char *)json_o_str(cinfo, "last_message_id");
 
         channel_info *ci = g_new0(channel_info, 1);
         ci->is_private = TRUE;
+        if (lmsg != NULL) {
+          ci->last_msg = g_ascii_strtoull(lmsg, NULL, 10);
+        }
         ci->to.user.handle = json_o_strdup(json_o_get(cinfo, "recipient"),
                                            "username");
         ci->id = json_o_strdup(cinfo, "id");
