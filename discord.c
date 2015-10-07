@@ -54,8 +54,20 @@ typedef struct _channel_info {
   server_info          *sinfo;
 } channel_info;
 
+typedef struct _user_info {
+  char                 *id;
+  bee_user_t           *user;
+} user_info;
+
 static void discord_http_get(struct im_connection *ic, const char *api_path,
                              http_input_function cb_func, gpointer data);
+
+static void free_user_info(user_info *uinfo) {
+  g_free(uinfo->id);
+  imcb_remove_buddy(uinfo->user->ic, uinfo->user->handle, NULL);
+
+  g_free(uinfo);
+}
 
 static void free_channel_info(channel_info *cinfo) {
   g_free(cinfo->id);
@@ -68,7 +80,7 @@ static void free_server_info(server_info *sinfo) {
   g_free(sinfo->name);
   g_free(sinfo->id);
 
-  g_slist_free(sinfo->users);
+  g_slist_free_full(sinfo->users, (GDestroyNotify)free_user_info);
   g_slist_free_full(sinfo->channels, (GDestroyNotify)free_channel_info);
 
   g_free(sinfo);
@@ -196,9 +208,9 @@ static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
     g_free(title);
 
     for (l = sinfo->users; l; l = l->next) {
-      bee_user_t *bu = l->data;
-      if (bu->ic == ic) {
-        imcb_chat_add_buddy(gc, bu->handle);
+      user_info *uinfo = l->data;
+      if (uinfo->user->ic == ic) {
+        imcb_chat_add_buddy(gc, uinfo->user->handle);
       }
     }
 
@@ -271,11 +283,14 @@ static void discord_users_cb(struct http_request *req) {
         const char *name = json_o_str(uinfo, "username");
 
         if (name && !bee_user_by_handle(ic->bee, ic, name)) {
-          bee_user_t *buser;
+          user_info *ui = g_new0(user_info, 1);
+
           imcb_add_buddy(ic, name, NULL);
-          // TODO: nickhint?
-          buser = bee_user_by_handle(ic->bee, ic, name);
-          sinfo->users = g_slist_prepend(sinfo->users, buser);
+
+          ui->user = bee_user_by_handle(ic->bee, ic, name);
+          ui->id = json_o_strdup(uinfo, "id");
+
+          sinfo->users = g_slist_prepend(sinfo->users, ui);
         }
 
       }
