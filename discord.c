@@ -66,6 +66,14 @@ typedef struct _user_info {
   bee_user_t           *user;
 } user_info;
 
+typedef struct _cadd {
+  server_info *sinfo;
+  char *name;
+  char *id;
+  char *last_msg;
+  char *topic;
+} cadd;
+
 static void discord_http_get(struct im_connection *ic, const char *api_path,
                              http_input_function cb_func, gpointer data);
 
@@ -233,47 +241,58 @@ static void try_start_loop(struct im_connection *ic) {
   }
 }
 
-static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
-  struct im_connection *ic = sinfo->ic;
+static void discord_add_channel(cadd *ca) {
+  struct im_connection *ic = ca->sinfo->ic;
   discord_data *dd = ic->proto_data;
 
-  if (g_strcmp0(json_o_str(cinfo, "type"), "text") == 0) {
-    char *title;
-    char *topic = (char *)json_o_str(cinfo, "topic");
-    char *lmsg = (char *)json_o_str(cinfo, "last_message_id");
-    GSList *l;
+  char *title;
+  GSList *l;
 
-    title = g_strdup_printf("%s/%s", sinfo->name, json_o_str(cinfo, "name"));
-    struct groupchat *gc = imcb_chat_new(ic, title);
-    imcb_chat_name_hint(gc, json_o_str(cinfo, "name"));
-    if (topic != NULL) {
-      imcb_chat_topic(gc, "root", topic, 0);
-    }
-    g_free(title);
-
-    // TODO: Check if we have access before joining
-    for (l = sinfo->users; l; l = l->next) {
-      user_info *uinfo = l->data;
-      if (uinfo->user->ic == ic) {
-        imcb_chat_add_buddy(gc, uinfo->user->handle);
-      }
-    }
-
-    imcb_chat_add_buddy(gc, dd->uname);
-
-    channel_info *ci = g_new0(channel_info, 1);
-    ci->is_private = FALSE;
-    ci->to.channel.gc = gc;
-    ci->to.channel.sinfo = sinfo;
-    ci->id = json_o_strdup(cinfo, "id");
-    if (lmsg != NULL) {
-      ci->last_msg = g_ascii_strtoull(lmsg, NULL, 10);
-    }
-
-    gc->data = ci;
-
-    dd->channels = g_slist_prepend(dd->channels, ci);
+  title = g_strdup_printf("%s/%s", ca->sinfo->name,
+                          ca->name);
+  struct groupchat *gc = imcb_chat_new(ic, title);
+  imcb_chat_name_hint(gc, ca->name);
+  if (ca->topic != NULL) {
+    imcb_chat_topic(gc, "root", ca->topic, 0);
   }
+  g_free(title);
+
+  for (l = ca->sinfo->users; l; l = l->next) {
+    user_info *uinfo = l->data;
+    if (uinfo->user->ic == ic) {
+      imcb_chat_add_buddy(gc, uinfo->user->handle);
+    }
+  }
+
+  imcb_chat_add_buddy(gc, dd->uname);
+
+  channel_info *ci = g_new0(channel_info, 1);
+  ci->is_private = FALSE;
+  ci->to.channel.gc = gc;
+  ci->to.channel.sinfo = ca->sinfo;
+  ci->id = g_strdup(ca->id);
+  if (ca->last_msg != NULL) {
+    ci->last_msg = g_ascii_strtoull(ca->last_msg, NULL, 10);
+  }
+
+  gc->data = ci;
+
+  dd->channels = g_slist_prepend(dd->channels, ci);
+}
+
+static void discord_check_access_cb(struct http_request *req) {
+  cadd *ca = req->data;
+  if (req->status_code == 200) {
+    discord_add_channel(ca);
+  } else {
+    imcb_error(ca->sinfo->ic, "Failed to get test messages from chat: %s (%d)."
+               " Not joining.", ca->name, req->status_code);
+  }
+  g_free(ca->id);
+  g_free(ca->name);
+  g_free(ca->topic);
+  g_free(ca->last_msg);
+  g_free(ca);
 }
 
 static void discord_channels_cb(struct http_request *req) {
@@ -295,7 +314,20 @@ static void discord_channels_cb(struct http_request *req) {
     for (i = 0; i < js->u.array.length; i++) {
       if (js->u.array.values[i]->type == json_object) {
         json_value *cinfo = js->u.array.values[i];
-        discord_add_channel(sinfo, cinfo);
+        if (g_strcmp0(json_o_str(cinfo, "type"), "text") == 0) {
+          GString *api_path = g_string_new("");
+          cadd *ca = g_new0(cadd, 1);
+          ca->sinfo = sinfo;
+          ca->topic = json_o_strdup(cinfo, "topic");
+          ca->id = json_o_strdup(cinfo, "id");
+          ca->name = json_o_strdup(cinfo, "name");
+          ca->last_msg = json_o_strdup(cinfo, "last_message_id");
+
+          g_string_printf(api_path, "channels/%s/messages?limit=1",
+                          ca->id);
+          discord_http_get(ic, api_path->str, discord_check_access_cb, ca);
+          g_string_free(api_path, TRUE);
+        }
       }
     }
     json_value_free(js);
