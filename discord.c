@@ -451,9 +451,8 @@ static gboolean discord_is_self(struct im_connection *ic, const char *who) {
   return !g_strcmp0(dd->uname, who);
 }
 
-static void discord_chat_msg(struct groupchat *gc, char *msg, int flags) {
-  channel_info *cinfo = gc->data;
-  discord_data *dd = cinfo->ic->proto_data;
+static void discord_send_msg(struct im_connection *ic, char *id, char *msg) {
+  discord_data *dd = ic->proto_data;
   GString *request = g_string_new("");
   GString *content = g_string_new("");
 
@@ -465,17 +464,23 @@ static void discord_chat_msg(struct groupchat *gc, char *msg, int flags) {
                   "Content-Type: application/json\r\n"
                   "Content-Length: %zd\r\n\r\n"
                   "%s",
-                  cinfo->id,
+                  id,
                   DISCORD_HOST,
                   dd->token,
                   content->len,
                   content->str);
 
   //g_print("Sending req:\n----------\n%s\n----------\n", request->str);
-  (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, NULL, cinfo->ic);
+  (void) http_dorequest(DISCORD_HOST, 80, 0, request->str, NULL, NULL);
 
   g_string_free(content, TRUE);
   g_string_free(request, TRUE);
+}
+
+static void discord_chat_msg(struct groupchat *gc, char *msg, int flags) {
+  channel_info *cinfo = gc->data;
+
+  discord_send_msg(cinfo->ic, cinfo->id, msg);
 }
 
 G_MODULE_EXPORT void init_plugin(void)
@@ -487,9 +492,7 @@ G_MODULE_EXPORT void init_plugin(void)
     .login = discord_login,
     .logout = discord_logout,
     .chat_msg = discord_chat_msg,
-    /*.buddy_msg = fb_buddy_msg,
-    .send_typing = fb_send_typing,
-    .chat_topic = fb_chat_topic,*/
+    //.buddy_msg = discord_buddy_msg,
     .handle_cmp = g_strcmp0,
     .handle_is_self = discord_is_self
   };
