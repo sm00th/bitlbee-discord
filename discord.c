@@ -50,7 +50,6 @@ typedef struct _channel_info {
   char                 *id;
   guint64              last_msg;
   struct groupchat     *gc;
-  struct im_connection *ic;
   server_info          *sinfo;
 } channel_info;
 
@@ -64,7 +63,6 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
 
 static void free_user_info(user_info *uinfo) {
   g_free(uinfo->id);
-  imcb_remove_buddy(uinfo->user->ic, uinfo->user->handle, NULL);
 
   g_free(uinfo);
 }
@@ -107,8 +105,8 @@ static void discord_dump_http_reply(struct http_request *req) {
 
 static void discord_messages_cb(struct http_request *req) {
   channel_info *cinfo = req->data;
-  struct im_connection *ic = cinfo->ic;
   struct groupchat *gc = cinfo->gc;
+  struct im_connection *ic = gc->ic;
 
   if (req->status_code == 200) {
     int i;
@@ -207,6 +205,7 @@ static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
     }
     g_free(title);
 
+    // TODO: Check if we have access before joining
     for (l = sinfo->users; l; l = l->next) {
       user_info *uinfo = l->data;
       if (uinfo->user->ic == ic) {
@@ -217,7 +216,6 @@ static void discord_add_channel(server_info *sinfo, json_value *cinfo) {
     imcb_chat_add_buddy(gc, dd->uname);
 
     channel_info *ci = g_new0(channel_info, 1);
-    ci->ic = sinfo->ic;
     ci->gc = gc;
     ci->id = json_o_strdup(cinfo, "id");
     ci->sinfo = sinfo;
@@ -451,8 +449,7 @@ static gboolean discord_is_self(struct im_connection *ic, const char *who) {
   return !g_strcmp0(dd->uname, who);
 }
 
-static void discord_send_msg(struct im_connection *ic, char *id, char *msg) {
-  discord_data *dd = ic->proto_data;
+static void discord_send_msg(discord_data *dd, char *id, char *msg) {
   GString *request = g_string_new("");
   GString *content = g_string_new("");
 
@@ -479,7 +476,7 @@ static void discord_send_msg(struct im_connection *ic, char *id, char *msg) {
 static void discord_chat_msg(struct groupchat *gc, char *msg, int flags) {
   channel_info *cinfo = gc->data;
 
-  discord_send_msg(cinfo->ic, cinfo->id, msg);
+  discord_send_msg(cinfo->gc->ic->proto_data, cinfo->id, msg);
 }
 
 G_MODULE_EXPORT void init_plugin(void)
