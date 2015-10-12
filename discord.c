@@ -504,40 +504,44 @@ static void discord_login_cb(struct http_request *req) {
 
   //discord_dump_http_reply(req);
 
-  json_value *js = json_parse(req->reply_body, req->body_size);
-  if (!js || js->type != json_object) {
-    imcb_error(ic, "Failed to parse json reply.");
-    imc_logout(ic, TRUE);
-    json_value_free(js);
-    return;
-  }
   if (req->status_code == 200) {
-    discord_data *dd = ic->proto_data;
-    dd->token = json_o_strdup(js, "token");
-
-    discord_http_get(ic, "users/@me", discord_me_cb, ic);
-    discord_http_get(ic, "users/@me/channels", discord_pchans_cb, ic);
-  } else {
-    JSON_O_FOREACH(js, k, v){
-      if (v->type != json_array) {
-        continue;
-      }
-
-      int i;
-      GString *err = g_string_new("");
-      g_string_printf(err, "%s:", k);
-      for (i = 0; i < v->u.array.length; i++) {
-        if (v->u.array.values[i]->type == json_string) {
-          g_string_append_printf(err, " %s",
-                                 v->u.array.values[i]->u.string.ptr);
-        }
-      }
-      imcb_error(ic, err->str);
-      g_string_free(err, TRUE);
-      imc_logout(ic, FALSE);
+    json_value *js = json_parse(req->reply_body, req->body_size);
+    if (!js || js->type != json_object) {
+      imcb_error(ic, "Failed to parse json reply.");
+      imc_logout(ic, TRUE);
+      json_value_free(js);
+      return;
     }
+    if (req->status_code == 200) {
+      discord_data *dd = ic->proto_data;
+      dd->token = json_o_strdup(js, "token");
+
+      discord_http_get(ic, "users/@me", discord_me_cb, ic);
+      discord_http_get(ic, "users/@me/channels", discord_pchans_cb, ic);
+    } else {
+      JSON_O_FOREACH(js, k, v){
+        if (v->type != json_array) {
+          continue;
+        }
+
+        int i;
+        GString *err = g_string_new("");
+        g_string_printf(err, "%s:", k);
+        for (i = 0; i < v->u.array.length; i++) {
+          if (v->u.array.values[i]->type == json_string) {
+            g_string_append_printf(err, " %s",
+                                   v->u.array.values[i]->u.string.ptr);
+          }
+        }
+        imcb_error(ic, err->str);
+        g_string_free(err, TRUE);
+      }
+    }
+    json_value_free(js);
+  } else {
+    imcb_error(ic, "Failed to login: %d.", req->status_code);
+    imc_logout(ic, TRUE);
   }
-  json_value_free(js);
 }
 
 static void discord_login(account_t *acc) {
