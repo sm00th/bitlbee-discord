@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS+=`pkg-config --cflags bitlbee` -fPIC -Wall
+CFLAGS+=`pkg-config --cflags bitlbee` -fPIC -Wall -g3 -ggdb -O0
 LDFLAGS+=-shared
 
 TARGET=discord.so
