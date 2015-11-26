@@ -8,7 +8,7 @@ $(TARGET): discord.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 install: $(TARGET)
-	install -m=755 $(TARGET) /usr/lib64/bitlbee
+	install -Dm=755 $(TARGET) "$(DESTDIR)/usr/lib64/bitlbee/$(TARGET)"
 
 clean:
 	rm -rf $(TARGET) *.o
