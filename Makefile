@@ -1,6 +1,7 @@
 CC=gcc
-CFLAGS+=`pkg-config --cflags bitlbee` -fPIC -Wall -g3 -ggdb -O0
+CFLAGS+=`pkg-config --cflags bitlbee` -fPIC -Wall -g3 -ggdb -O0 -std=gnu99
 LDFLAGS+=-shared
+LDFLAGS+=`pkg-config --libs libwebsockets`
 
 TARGET=discord.so
 
