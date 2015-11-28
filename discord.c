@@ -172,9 +172,14 @@ static gint cmp_server_id(const server_info *sinfo, const char *server_id) {
 }
 
 static void lws_send_keepalive(discord_data *dd) {
-  time_t curtime = time(NULL);
-  if (curtime - dd->ka_timestamp > dd->ka_interval) {
-    libwebsocket_callback_on_writable(dd->lwsctx, dd->lws);
+  time_t ctime = time(NULL);
+  if (ctime - dd->ka_timestamp > dd->ka_interval) {
+    GString *buf = g_string_new("");
+
+    g_string_printf(buf, "{\"op\":1,\"d\":%tu}", ctime);
+    lws_send_payload(dd->lws, buf->str, buf->len);
+    g_string_free(buf, TRUE);
+    dd->ka_timestamp = ctime;
   }
 }
 
@@ -477,17 +482,12 @@ discord_lws_http_only_cb(struct libwebsocket_context *this,
       break;
     case LWS_CALLBACK_CLIENT_WRITEABLE:
       g_print("%s: client writable\n", __func__);
-      GString *buf = g_string_new("");
       if (dd->state == WS_CONNECTED) {
+        GString *buf = g_string_new("");
         g_string_printf(buf, "{\"d\":{\"v\":3,\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"}},\"op\":2}", dd->token);
         lws_send_payload(wsi, buf->str, buf->len);
-      } else if (dd->state == WS_READY) {
-        time_t curtime = time(NULL);
-        g_string_printf(buf, "{\"op\":1,\"d\":%tu}", curtime);
-        lws_send_payload(wsi, buf->str, buf->len);
-        dd->ka_timestamp = curtime;
+        g_string_free(buf, TRUE);
       }
-      g_string_free(buf, TRUE);
       break;
     case LWS_CALLBACK_CLIENT_RECEIVE:
       {
