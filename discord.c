@@ -40,7 +40,7 @@ typedef struct _discord_data {
   struct libwebsocket_context *lwsctx;
   struct libwebsocket *lws;
   GSList   *servers;
-  GSList   *channels;
+  GSList   *pchannels;
   gint     main_loop_id;
   GString  *ws_buf;
   ws_state state;
@@ -52,6 +52,7 @@ typedef struct _server_info {
   char                 *name;
   char                 *id;
   GSList               *users;
+  GSList               *channels;
   struct im_connection *ic;
 } server_info;
 
@@ -73,6 +74,7 @@ typedef struct _channel_info {
 
 typedef struct _user_info {
   char                 *id;
+  char                 *name;
   bee_user_t           *user;
 } user_info;
 
@@ -88,8 +90,8 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
                              http_input_function cb_func, gpointer data);
 
 static void free_user_info(user_info *uinfo) {
+  g_free(uinfo->name);
   g_free(uinfo->id);
-
   g_free(uinfo);
 }
 
@@ -110,6 +112,7 @@ static void free_server_info(server_info *sinfo) {
   g_free(sinfo->name);
   g_free(sinfo->id);
 
+  g_slist_free_full(sinfo->channels, (GDestroyNotify)free_channel_info);
   g_slist_free_full(sinfo->users, (GDestroyNotify)free_user_info);
 
   g_free(sinfo);
@@ -120,7 +123,7 @@ static void discord_logout(struct im_connection *ic) {
 
   b_event_remove(dd->main_loop_id);
 
-  g_slist_free_full(dd->channels, (GDestroyNotify)free_channel_info);
+  g_slist_free_full(dd->pchannels, (GDestroyNotify)free_channel_info);
   g_slist_free_full(dd->servers, (GDestroyNotify)free_server_info);
 
   g_free(dd->gateway);
@@ -144,20 +147,28 @@ static void discord_send_msg_cb(struct http_request *req) {
 }
 
 static int lws_send_payload(struct libwebsocket *wsi, const char *pload,
-			    size_t psize) {
+                            size_t psize) {
   int ret = 0;
   unsigned char *buf = g_malloc0(LWS_SEND_BUFFER_PRE_PADDING + \
-				 psize + LWS_SEND_BUFFER_POST_PADDING);
+                                 psize + LWS_SEND_BUFFER_POST_PADDING);
   strncpy((char*)&buf[LWS_SEND_BUFFER_PRE_PADDING], pload, psize);
   g_print(">>> %s\n", pload);
   ret = libwebsocket_write(wsi, &buf[LWS_SEND_BUFFER_PRE_PADDING], psize,
-			  LWS_WRITE_TEXT);
+                           LWS_WRITE_TEXT);
   g_free(buf);
   return ret;
 }
 
 static gint cmp_chan_id(const channel_info *cinfo, const char *chan_id) {
   return g_strcmp0(cinfo->id, chan_id);
+}
+
+static gint cmp_user_id(const user_info *uinfo, const char *user_id) {
+  return g_strcmp0(uinfo->id, user_id);
+}
+
+static gint cmp_server_id(const server_info *sinfo, const char *server_id) {
+  return g_strcmp0(sinfo->id, server_id);
 }
 
 static void lws_send_keepalive(discord_data *dd) {
@@ -184,7 +195,6 @@ static void discord_add_channel(cadd *ca) {
   discord_data *dd = ic->proto_data;
 
   char *title;
-  GSList *l;
 
   title = g_strdup_printf("%s/%s", ca->sinfo->name,
                           ca->name);
@@ -194,14 +204,6 @@ static void discord_add_channel(cadd *ca) {
     imcb_chat_topic(gc, "root", ca->topic, 0);
   }
   g_free(title);
-
-  for (l = ca->sinfo->users; l; l = l->next) {
-    user_info *uinfo = l->data;
-    if (uinfo->user->ic == ic &&
-        g_strcmp0(uinfo->user->handle, dd->uname) != 0) {
-      imcb_chat_add_buddy(gc, uinfo->user->handle);
-    }
-  }
 
   imcb_chat_add_buddy(gc, dd->uname);
 
@@ -216,7 +218,59 @@ static void discord_add_channel(cadd *ca) {
 
   gc->data = ci;
 
-  dd->channels = g_slist_prepend(dd->channels, ci);
+  ca->sinfo->channels = g_slist_prepend(ca->sinfo->channels, ci);
+}
+
+static void handle_presence(struct im_connection *ic, json_value *pinfo,
+                            const char *server_id) {
+  discord_data *dd = ic->proto_data;
+  server_info *sinfo;
+  GSList *sl = g_slist_find_custom(dd->servers, server_id,
+                                   (GCompareFunc)cmp_server_id);
+
+  if (sl != NULL) {
+    sinfo = sl->data;
+  } else {
+    return;
+  }
+
+  GSList *ul = g_slist_find_custom(sinfo->users,
+                                   json_o_str(
+                                     json_o_get(pinfo, "user"),
+                                     "id"),
+                                   (GCompareFunc)cmp_user_id);
+
+  if (ul != NULL) {
+    user_info *uinfo = (user_info*)ul->data;
+    const char *status = json_o_str(pinfo, "status");
+    int flags = 0;
+
+    if (uinfo->user->ic != ic ||
+        g_strcmp0(uinfo->user->handle, dd->uname) == 0) {
+      return;
+    }
+
+    if (g_strcmp0(status, "online") == 0) {
+      flags = BEE_USER_ONLINE;
+    } else if (g_strcmp0(status, "idle") == 0) {
+      flags = BEE_USER_ONLINE | BEE_USER_AWAY;
+    }
+
+    for (GSList *cl = sinfo->channels; cl; cl = g_slist_next(cl)) {
+      channel_info *cinfo = cl->data;
+
+      if (flags) {
+        imcb_chat_add_buddy(cinfo->to.channel.gc, uinfo->user->handle);
+      } else {
+        imcb_chat_remove_buddy(cinfo->to.channel.gc, uinfo->user->handle,
+                               NULL);
+      }
+    }
+
+    imcb_buddy_status(ic, uinfo->name, flags, NULL, NULL);
+    g_print("presence_update: %s->%s [0x%x]\n", uinfo->name, status,
+            uinfo->user->flags);
+  }
 }
 
 static void parse_message(struct im_connection *ic) {
@@ -241,7 +295,7 @@ static void parse_message(struct im_connection *ic) {
     if (hbeat != NULL && hbeat->type == json_integer) {
       dd->ka_interval = hbeat->u.integer / 1000;
       if (dd->ka_interval == 0) {
-	dd->ka_interval = DEFAULT_KA_INTERVAL;
+        dd->ka_interval = DEFAULT_KA_INTERVAL;
       }
       g_print("Updated ka_interval to %u\n", dd->ka_interval);
     }
@@ -256,117 +310,141 @@ static void parse_message(struct im_connection *ic) {
     json_value *guilds = json_o_get(data, "guilds");
     if (guilds != NULL && guilds->type == json_array) {
       for (int gidx = 0; gidx < guilds->u.array.length; gidx++) {
-	if (guilds->u.array.values[gidx]->type == json_object) {
-	  json_value *ginfo = guilds->u.array.values[gidx];
-	  g_print("ginfo: name=%s; id=%s;\n", json_o_str(ginfo, "name"), json_o_strdup(ginfo, "id"));
+        if (guilds->u.array.values[gidx]->type == json_object) {
+          json_value *ginfo = guilds->u.array.values[gidx];
+          g_print("ginfo: name=%s; id=%s;\n", json_o_str(ginfo, "name"), json_o_strdup(ginfo, "id"));
 
-	  server_info *sinfo = g_new0(server_info, 1);
+          server_info *sinfo = g_new0(server_info, 1);
 
-	  sinfo->name = json_o_strdup(ginfo, "name");
-	  sinfo->id = json_o_strdup(ginfo, "id");
-	  sinfo->ic = ic;
+          sinfo->name = json_o_strdup(ginfo, "name");
+          sinfo->id = json_o_strdup(ginfo, "id");
+          sinfo->ic = ic;
+          dd->servers = g_slist_prepend(dd->servers, sinfo);
 
-	  json_value *members = json_o_get(ginfo, "members");
-	  if (members != NULL && members->type == json_array) {
-	    for (int midx = 0; midx < members->u.array.length; midx++) {
-	      json_value *uinfo = json_o_get(members->u.array.values[midx], "user");
+          json_value *channels = json_o_get(ginfo, "channels");
+          if (channels != NULL && channels->type == json_array) {
+            for (int cidx = 0; cidx < channels->u.array.length; cidx++) {
+              json_value *cinfo = channels->u.array.values[cidx];
 
-	      g_print("uinfo: name=%s; id=%s;\n", json_o_str(uinfo, "username"), json_o_strdup(uinfo, "id"));
-	      const char *name = json_o_str(uinfo, "username");
+              g_print("cinfo: name=%s; topic=%s; id=%s;\n", json_o_str(cinfo, "name"), json_o_str(cinfo, "topic"), json_o_strdup(cinfo, "id"));
+              if (g_strcmp0(json_o_str(cinfo, "type"), "text") == 0) {
+                cadd *ca = g_new0(cadd, 1);
+                ca->sinfo = sinfo;
+                ca->topic = json_o_strdup(cinfo, "topic");
+                ca->id = json_o_strdup(cinfo, "id");
+                ca->name = json_o_strdup(cinfo, "name");
+                ca->last_msg = json_o_strdup(cinfo, "last_message_id");
 
-	      if (name && !bee_user_by_handle(ic->bee, ic, name)) {
-		user_info *ui = g_new0(user_info, 1);
+                // TODO: Check access
+                discord_add_channel(ca);
+              }
+            }
+          }
 
-		imcb_add_buddy(ic, name, NULL);
+          json_value *members = json_o_get(ginfo, "members");
+          if (members != NULL && members->type == json_array) {
+            for (int midx = 0; midx < members->u.array.length; midx++) {
+              json_value *uinfo = json_o_get(members->u.array.values[midx],
+                                             "user");
 
-		ui->user = bee_user_by_handle(ic->bee, ic, name);
-		ui->id = json_o_strdup(uinfo, "id");
+              g_print("uinfo: name=%s; id=%s;\n", json_o_str(uinfo, "username"), json_o_strdup(uinfo, "id"));
+              const char *name = json_o_str(uinfo, "username");
 
-		sinfo->users = g_slist_prepend(sinfo->users, ui);
-	      }
-	    }
-	  }
+              if (name && !bee_user_by_handle(ic->bee, ic, name)) {
+                user_info *ui = g_new0(user_info, 1);
 
-	  json_value *channels = json_o_get(ginfo, "channels");
-	  if (channels != NULL && channels->type == json_array) {
-	    for (int cidx = 0; cidx < channels->u.array.length; cidx++) {
-	      json_value *cinfo = channels->u.array.values[cidx];
+                imcb_add_buddy(ic, name, NULL);
+                imcb_buddy_status(ic, name, 0, NULL, NULL);
 
-	      g_print("cinfo: name=%s; topic=%s; id=%s;\n", json_o_str(cinfo, "name"), json_o_str(cinfo, "topic"), json_o_strdup(cinfo, "id"));
-	      if (g_strcmp0(json_o_str(cinfo, "type"), "text") == 0) {
-		cadd *ca = g_new0(cadd, 1);
-		ca->sinfo = sinfo;
-		ca->topic = json_o_strdup(cinfo, "topic");
-		ca->id = json_o_strdup(cinfo, "id");
-		ca->name = json_o_strdup(cinfo, "name");
-		ca->last_msg = json_o_strdup(cinfo, "last_message_id");
+                ui->user = bee_user_by_handle(ic->bee, ic, name);
+                ui->id = json_o_strdup(uinfo, "id");
+                ui->name = json_o_strdup(uinfo, "username");
 
-		// TODO: Check access
-		discord_add_channel(ca);
-	      }
-	    }
-	  }
+                sinfo->users = g_slist_prepend(sinfo->users, ui);
+              }
+            }
+          }
 
-	  dd->servers = g_slist_prepend(dd->servers, sinfo);
-	}
+          json_value *presences = json_o_get(ginfo, "presences");
+          if (presences != NULL && presences->type == json_array) {
+            for (int pidx = 0; pidx < presences->u.array.length; pidx++) {
+              json_value *pinfo = presences->u.array.values[pidx];
+              handle_presence(ic, pinfo, sinfo->id);
+            }
+          }
+        }
       }
     }
 
     json_value *pcs = json_o_get(data, "private_channels");
     if (pcs != NULL && pcs->type == json_array) {
       for (int pcidx = 0; pcidx < pcs->u.array.length; pcidx++) {
-	if (pcs->u.array.values[pcidx]->type == json_object) {
-	  json_value *pcinfo = pcs->u.array.values[pcidx];
-	  g_print("pcinfo: name=%s; id=%s;\n", json_o_str(json_o_get(pcinfo, "recipient"), "username"), json_o_strdup(pcinfo, "id"));
+        if (pcs->u.array.values[pcidx]->type == json_object) {
+          json_value *pcinfo = pcs->u.array.values[pcidx];
+          g_print("pcinfo: name=%s; id=%s;\n", json_o_str(json_o_get(pcinfo, "recipient"), "username"), json_o_strdup(pcinfo, "id"));
 
-	  char *lmsg = (char *)json_o_str(pcinfo, "last_message_id");
+          char *lmsg = (char *)json_o_str(pcinfo, "last_message_id");
 
-	  channel_info *ci = g_new0(channel_info, 1);
-	  ci->is_private = TRUE;
-	  if (lmsg != NULL) {
-	    ci->last_msg = g_ascii_strtoull(lmsg, NULL, 10);
-	  }
-	  ci->to.user.handle = json_o_strdup(json_o_get(pcinfo, "recipient"),
-					     "username");
-	  ci->id = json_o_strdup(pcinfo, "id");
-	  ci->to.user.ic = ic;
+          channel_info *ci = g_new0(channel_info, 1);
+          ci->is_private = TRUE;
+          if (lmsg != NULL) {
+            ci->last_msg = g_ascii_strtoull(lmsg, NULL, 10);
+          }
+          ci->to.user.handle = json_o_strdup(json_o_get(pcinfo, "recipient"),
+                     "username");
+          ci->id = json_o_strdup(pcinfo, "id");
+          ci->to.user.ic = ic;
 
-	  dd->channels = g_slist_prepend(dd->channels, ci);
-	}
+          dd->pchannels = g_slist_prepend(dd->pchannels, ci);
+        }
       }
     }
 
     imcb_connected(ic);
+  } else if (g_strcmp0(event, "TYPING_START") == 0) {
+    // Ignoring those for now
   } else if (g_strcmp0(event, "PRESENCE_UPDATE") == 0) {
-    // TODO: We don't care about this right now but we should
+    json_value *pinfo = json_o_get(js, "d");
+    handle_presence(ic, pinfo, json_o_str(pinfo, "guild_id"));
   } else if (g_strcmp0(event, "MESSAGE_CREATE") == 0) {
     json_value *minfo = json_o_get(js, "d");
+    g_print("MSG: %s\n", dd->ws_buf->str);
 
     if (minfo == NULL || minfo->type != json_object) {
       goto exit;
     }
 
     guint64 msgid = g_ascii_strtoull(json_o_str(minfo, "id"), NULL, 10);
-    GSList *cl = g_slist_find_custom(dd->channels,
-				     json_o_str(minfo, "channel_id"),
-				     (GCompareFunc)cmp_chan_id);
+    const char *channel_id = json_o_str(minfo, "channel_id");
+    GSList *cl = g_slist_find_custom(dd->pchannels, channel_id,
+                                     (GCompareFunc)cmp_chan_id);
     if (cl == NULL) {
-      goto exit;
+      for (GSList *sl = dd->servers; sl; sl = g_slist_next(sl)) {
+        server_info *sinfo = sl->data;
+        cl = g_slist_find_custom(sinfo->channels, channel_id,
+                                 (GCompareFunc)cmp_chan_id);
+        if (cl != NULL) {
+          break;
+        }
+      }
+      if (cl == NULL) {
+        goto exit;
+      }
     }
     channel_info *cinfo = cl->data;
 
     if (msgid > cinfo->last_msg) {
       if (cinfo->is_private) {
-	if (!g_strcmp0(json_o_str(json_o_get(minfo, "author"), "username"),
-		       cinfo->to.user.handle)) {
-	  imcb_buddy_msg(cinfo->to.user.ic,
-			 cinfo->to.user.handle,
-			 (char *)json_o_str(minfo, "content"), 0, 0);
-	}
+        if (!g_strcmp0(json_o_str(json_o_get(minfo, "author"), "username"),
+                 cinfo->to.user.handle)) {
+          imcb_buddy_msg(cinfo->to.user.ic,
+                         cinfo->to.user.handle,
+                         (char *)json_o_str(minfo, "content"), 0, 0);
+        }
       } else {
-	struct groupchat *gc = cinfo->to.channel.gc;
-	imcb_chat_msg(gc, json_o_str(json_o_get(minfo, "author"), "username"),
-		      (char *)json_o_str(minfo, "content"), 0, 0);
+        struct groupchat *gc = cinfo->to.channel.gc;
+        imcb_chat_msg(gc, json_o_str(json_o_get(minfo, "author"), "username"),
+                      (char *)json_o_str(minfo, "content"), 0, 0);
       }
       cinfo->last_msg = msgid;
     }
@@ -401,31 +479,31 @@ discord_lws_http_only_cb(struct libwebsocket_context *this,
       g_print("%s: client writable\n", __func__);
       GString *buf = g_string_new("");
       if (dd->state == WS_CONNECTED) {
-	g_string_printf(buf, "{\"d\":{\"v\":3,\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"}},\"op\":2}", dd->token);
-	lws_send_payload(wsi, buf->str, buf->len);
+        g_string_printf(buf, "{\"d\":{\"v\":3,\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"}},\"op\":2}", dd->token);
+        lws_send_payload(wsi, buf->str, buf->len);
       } else if (dd->state == WS_READY) {
-	time_t curtime = time(NULL);
-	g_string_printf(buf, "{\"op\":1,\"d\":%tu}", curtime);
-	lws_send_payload(wsi, buf->str, buf->len);
-	dd->ka_timestamp = curtime;
+        time_t curtime = time(NULL);
+        g_string_printf(buf, "{\"op\":1,\"d\":%tu}", curtime);
+        lws_send_payload(wsi, buf->str, buf->len);
+        dd->ka_timestamp = curtime;
       }
       g_string_free(buf, TRUE);
       break;
     case LWS_CALLBACK_CLIENT_RECEIVE:
       {
-	size_t rpload = libwebsockets_remaining_packet_payload(wsi);
-	g_print("%s: client receive: %p %zd [%zd]\n", __func__, dd->ws_buf, len, rpload);
-	if (dd->ws_buf == NULL) {
-	  dd->ws_buf = g_string_new("");
-	}
-	dd->ws_buf = g_string_append(dd->ws_buf, in);
-	if (rpload == 0) {
-	  //g_print("<<< %s\n", dd->ws_buf->str);
-	  parse_message(ic);
-	  g_string_free(dd->ws_buf, TRUE);
-	  dd->ws_buf = NULL;
-	}
-	break;
+        size_t rpload = libwebsockets_remaining_packet_payload(wsi);
+        g_print("%s: client receive: %p %zd [%zd]\n", __func__, dd->ws_buf, len, rpload);
+        if (dd->ws_buf == NULL) {
+          dd->ws_buf = g_string_new("");
+        }
+        dd->ws_buf = g_string_append(dd->ws_buf, in);
+        if (rpload == 0) {
+          //g_print("<<< %s\n", dd->ws_buf->str);
+          parse_message(ic);
+          g_string_free(dd->ws_buf, TRUE);
+          dd->ws_buf = NULL;
+        }
+        break;
       }
     case LWS_CALLBACK_CLIENT_CONFIRM_EXTENSION_SUPPORTED:
       g_print("%s: client extension:\n%s\n", __func__, (char*)in);
@@ -436,11 +514,11 @@ discord_lws_http_only_cb(struct libwebsocket_context *this,
       break;
     case LWS_CALLBACK_ADD_POLL_FD:
       {
-	struct libwebsocket_pollargs *pargs = in;
-	g_print("%s: lws add loop: %d 0x%x\n", __func__, pargs->fd, pargs->events);
-	dd->main_loop_id = b_input_add(pargs->fd, B_EV_IO_READ | B_EV_IO_WRITE,
-				       lws_service_loop, ic);
-	break;
+        struct libwebsocket_pollargs *pargs = in;
+        g_print("%s: lws add loop: %d 0x%x\n", __func__, pargs->fd, pargs->events);
+        dd->main_loop_id = b_input_add(pargs->fd, B_EV_IO_READ | B_EV_IO_WRITE,
+                                       lws_service_loop, ic);
+        break;
       }
     case LWS_CALLBACK_DEL_POLL_FD:
       g_print("%s: lws remove loop: %d\n", __func__, dd->main_loop_id);
@@ -459,8 +537,8 @@ discord_lws_http_only_cb(struct libwebsocket_context *this,
 }
 
 static struct libwebsocket_protocols protocols[] = {
-	{ "http-only,chat", discord_lws_http_only_cb, 0, 0 },
-	{ NULL, NULL, 0, 0 } /* end */
+  { "http-only,chat", discord_lws_http_only_cb, 0, 0 },
+  { NULL, NULL, 0, 0 } /* end */
 };
 
 static void discord_gateway_cb(struct http_request *req) {
@@ -634,18 +712,18 @@ static void discord_chat_msg(struct groupchat *gc, char *msg, int flags) {
 }
 
 static int discord_buddy_msg(struct im_connection *ic, char *to, char *msg,
-                              int flags) {
+                             int flags) {
   discord_data *dd = ic->proto_data;
-  GSList *l;
 
-  for (l = dd->channels; l; l = l->next) {
-    channel_info *cinfo = l->data;
+  for (GSList *cl = dd->pchannels; cl; cl = g_slist_next(cl)) {
+    channel_info *cinfo = cl->data;
     if (cinfo->is_private && g_strcmp0(cinfo->to.user.handle, to) == 0) {
       discord_send_msg(ic, cinfo->id, msg);
+      return 0;
     }
   }
 
-  return 0;
+  return 1;
 }
 
 static void discord_init(account_t *acc) {
