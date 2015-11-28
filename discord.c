@@ -434,16 +434,19 @@ discord_lws_http_only_cb(struct libwebsocket_context *this,
       imc_logout(ic, TRUE);
       break;
     case LWS_CALLBACK_ADD_POLL_FD:
-      g_print("%s: lws add loop: %d\n", __func__, dd->main_loop_id);
-      dd->main_loop_id = b_timeout_add(100, lws_service_loop, ic);
-      break;
+      {
+	struct libwebsocket_pollargs *pargs = in;
+	g_print("%s: lws add loop: %d 0x%x\n", __func__, pargs->fd, pargs->events);
+	dd->main_loop_id = b_input_add(pargs->fd, B_EV_IO_READ | B_EV_IO_WRITE,
+				       lws_service_loop, ic);
+	break;
+      }
     case LWS_CALLBACK_DEL_POLL_FD:
       g_print("%s: lws remove loop: %d\n", __func__, dd->main_loop_id);
       b_event_remove(dd->main_loop_id);
-      dd->main_loop_id = 0;
       break;
-    case LWS_CALLBACK_GET_THREAD_ID:
     case LWS_CALLBACK_CHANGE_MODE_POLL_FD:
+    case LWS_CALLBACK_GET_THREAD_ID:
     case LWS_CALLBACK_LOCK_POLL:
     case LWS_CALLBACK_UNLOCK_POLL:
       break;
