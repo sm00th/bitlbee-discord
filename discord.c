@@ -32,6 +32,12 @@ typedef enum {
   WS_READY
 } ws_state;
 
+typedef enum {
+  ACTION_CREATE,
+  ACTION_DELETE,
+  ACTION_UPDATE
+} handler_action;
+
 typedef struct _discord_data {
   char     *token;
   char     *id;
@@ -171,6 +177,27 @@ static gint cmp_server_id(const server_info *sinfo, const char *server_id) {
   return g_strcmp0(sinfo->id, server_id);
 }
 
+static server_info *get_server_by_id(discord_data *dd, const char *server_id) {
+  GSList *sl = g_slist_find_custom(dd->servers, server_id,
+                                   (GCompareFunc)cmp_server_id);
+
+  return sl == NULL ?  NULL : sl->data;
+}
+
+static channel_info *get_channel_by_id(discord_data *dd, const char *channel_id,
+                                      const char *server_id) {
+  GSList *cl = g_slist_find_custom(dd->pchannels, channel_id,
+                                   (GCompareFunc)cmp_chan_id);
+
+  if (cl == NULL && server_id != NULL) {
+    server_info *sinfo = get_server_by_id(dd, server_id);
+    cl = g_slist_find_custom(sinfo->channels, channel_id,
+                             (GCompareFunc)cmp_chan_id);
+  }
+
+  return cl == NULL ?  NULL : cl->data;
+}
+
 static void lws_send_keepalive(discord_data *dd) {
   time_t ctime = time(NULL);
   if (ctime - dd->ka_timestamp > dd->ka_interval) {
@@ -210,32 +237,35 @@ static void discord_add_channel(cadd *ca) {
   }
   g_free(title);
 
-  imcb_chat_add_buddy(gc, dd->uname);
-
-  channel_info *ci = g_new0(channel_info, 1);
-  ci->is_private = FALSE;
-  ci->to.channel.gc = gc;
-  ci->to.channel.sinfo = ca->sinfo;
-  ci->id = g_strdup(ca->id);
-  if (ca->last_msg != NULL) {
-    ci->last_msg = g_ascii_strtoull(ca->last_msg, NULL, 10);
+  for (GSList *ul = ca->sinfo->users; ul; ul = g_slist_next(ul)) {
+    user_info *uinfo = ul->data;
+    if (uinfo->user->flags & BEE_USER_ONLINE) {
+      imcb_chat_add_buddy(gc, uinfo->user->handle);
+    }
   }
 
-  gc->data = ci;
+  imcb_chat_add_buddy(gc, dd->uname);
 
-  ca->sinfo->channels = g_slist_prepend(ca->sinfo->channels, ci);
+  channel_info *cinfo = g_new0(channel_info, 1);
+  cinfo->is_private = FALSE;
+  cinfo->to.channel.gc = gc;
+  cinfo->to.channel.sinfo = ca->sinfo;
+  cinfo->id = g_strdup(ca->id);
+  if (ca->last_msg != NULL) {
+    cinfo->last_msg = g_ascii_strtoull(ca->last_msg, NULL, 10);
+  }
+
+  gc->data = cinfo;
+
+  ca->sinfo->channels = g_slist_prepend(ca->sinfo->channels, cinfo);
 }
 
 static void handle_presence(struct im_connection *ic, json_value *pinfo,
                             const char *server_id) {
   discord_data *dd = ic->proto_data;
-  server_info *sinfo;
-  GSList *sl = g_slist_find_custom(dd->servers, server_id,
-                                   (GCompareFunc)cmp_server_id);
+  server_info *sinfo = get_server_by_id(dd, server_id);
 
-  if (sl != NULL) {
-    sinfo = sl->data;
-  } else {
+  if (sinfo == NULL) {
     return;
   }
 
@@ -275,6 +305,57 @@ static void handle_presence(struct im_connection *ic, json_value *pinfo,
     imcb_buddy_status(ic, uinfo->name, flags, NULL, NULL);
     g_print("presence_update: %s->%s [0x%x]\n", uinfo->name, status,
             uinfo->user->flags);
+  }
+}
+
+static void handle_channel(struct im_connection *ic, json_value *cinfo,
+                           const char *server_id, handler_action action) {
+
+  discord_data *dd = ic->proto_data;
+  server_info *sinfo = get_server_by_id(dd, server_id);
+
+  const char *id    = json_o_str(cinfo, "id");
+  const char *name  = json_o_str(cinfo, "name");
+  const char *type  = json_o_str(cinfo, "type");
+  const char *lmid  = json_o_str(cinfo, "last_message_id");
+  const char *topic = json_o_str(cinfo, "topic");
+
+  g_print("[%x] cinfo: name=%s; topic=%s; id=%s;\n", action, name, topic, id);
+  if (action == ACTION_CREATE) {
+    if (g_strcmp0(type, "text") == 0) {
+      cadd *ca = g_new0(cadd, 1);
+      ca->sinfo = sinfo;
+      ca->topic = g_strdup(topic);
+      ca->id = g_strdup(id);
+      ca->name = g_strdup(name);
+      ca->last_msg = g_strdup(lmid);
+
+      // TODO: Check access
+      discord_add_channel(ca);
+    }
+  } else {
+    channel_info *cdata = get_channel_by_id(dd, id, server_id);
+    if (cdata == NULL) {
+      return;
+    }
+
+    if (action == ACTION_DELETE) {
+      GSList *clist;
+      if (cdata->is_private == TRUE) {
+        clist = dd->pchannels;
+      } else {
+        clist = sinfo->channels;
+      }
+
+      clist = g_slist_remove(clist, cdata);
+      free_channel_info(cdata);
+    } else if (action == ACTION_UPDATE) {
+      if (cdata->is_private == FALSE) {
+        if (g_strcmp0(topic, cdata->to.channel.gc->topic) != 0) {
+          imcb_chat_topic(cdata->to.channel.gc, "root", (char*)topic, 0);
+        }
+      }
+    }
   }
 }
 
@@ -330,19 +411,7 @@ static void parse_message(struct im_connection *ic) {
           if (channels != NULL && channels->type == json_array) {
             for (int cidx = 0; cidx < channels->u.array.length; cidx++) {
               json_value *cinfo = channels->u.array.values[cidx];
-
-              g_print("cinfo: name=%s; topic=%s; id=%s;\n", json_o_str(cinfo, "name"), json_o_str(cinfo, "topic"), json_o_strdup(cinfo, "id"));
-              if (g_strcmp0(json_o_str(cinfo, "type"), "text") == 0) {
-                cadd *ca = g_new0(cadd, 1);
-                ca->sinfo = sinfo;
-                ca->topic = json_o_strdup(cinfo, "topic");
-                ca->id = json_o_strdup(cinfo, "id");
-                ca->name = json_o_strdup(cinfo, "name");
-                ca->last_msg = json_o_strdup(cinfo, "last_message_id");
-
-                // TODO: Check access
-                discord_add_channel(ca);
-              }
+              handle_channel(ic, cinfo, sinfo->id, ACTION_CREATE);
             }
           }
 
@@ -411,6 +480,15 @@ static void parse_message(struct im_connection *ic) {
   } else if (g_strcmp0(event, "PRESENCE_UPDATE") == 0) {
     json_value *pinfo = json_o_get(js, "d");
     handle_presence(ic, pinfo, json_o_str(pinfo, "guild_id"));
+  } else if (g_strcmp0(event, "CHANNEL_CREATE") == 0) {
+    json_value *cinfo = json_o_get(js, "d");
+    handle_channel(ic, cinfo, json_o_str(cinfo, "guild_id"), ACTION_CREATE);
+  } else if (g_strcmp0(event, "CHANNEL_DELETE") == 0) {
+    json_value *cinfo = json_o_get(js, "d");
+    handle_channel(ic, cinfo, json_o_str(cinfo, "guild_id"), ACTION_DELETE);
+  } else if (g_strcmp0(event, "CHANNEL_UPDATE") == 0) {
+    json_value *cinfo = json_o_get(js, "d");
+    handle_channel(ic, cinfo, json_o_str(cinfo, "guild_id"), ACTION_UPDATE);
   } else if (g_strcmp0(event, "MESSAGE_CREATE") == 0) {
     json_value *minfo = json_o_get(js, "d");
     g_print("MSG: %s\n", dd->ws_buf->str);
