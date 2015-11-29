@@ -167,7 +167,6 @@ static int lws_send_payload(struct libwebsocket *wsi, const char *pload,
   unsigned char *buf = g_malloc0(LWS_SEND_BUFFER_PRE_PADDING + \
                                  psize + LWS_SEND_BUFFER_POST_PADDING);
   strncpy((char*)&buf[LWS_SEND_BUFFER_PRE_PADDING], pload, psize);
-  g_print(">>> %s\n", pload);
   ret = libwebsocket_write(wsi, &buf[LWS_SEND_BUFFER_PRE_PADDING], psize,
                            LWS_WRITE_TEXT);
   g_free(buf);
@@ -312,8 +311,6 @@ static void handle_presence(struct im_connection *ic, json_value *pinfo,
     }
 
     imcb_buddy_status(ic, uinfo->name, flags, NULL, NULL);
-    g_print("presence_update: %s->%s [0x%x]\n", uinfo->name, status,
-            uinfo->user->flags);
   }
 }
 
@@ -333,7 +330,6 @@ static void handle_channel(struct im_connection *ic, json_value *cinfo,
   const char *lmid  = json_o_str(cinfo, "last_message_id");
   const char *topic = json_o_str(cinfo, "topic");
 
-  g_print("[%x] cinfo: name=%s; topic=%s; id=%s;\n", action, name, topic, id);
   if (action == ACTION_CREATE) {
     if (g_strcmp0(type, "text") == 0) {
       cadd *ca = g_new0(cadd, 1);
@@ -384,7 +380,6 @@ static void handle_user(struct im_connection *ic, json_value *uinfo,
 
   const char *id   = json_o_str(uinfo, "id");
   const char *name = json_o_str(uinfo, "username");
-  g_print("[%x] uinfo: name=%s; id=%s;\n", action, name, id);
 
   if (action == ACTION_CREATE) {
     if (name && !bee_user_by_handle(ic->bee, ic, name)) {
@@ -421,8 +416,6 @@ static void handle_server(struct im_connection *ic, json_value *sinfo,
 
   const char *id   = json_o_str(sinfo, "id");
   const char *name = json_o_str(sinfo, "name");
-
-  g_print("sinfo: name=%s; id=%s;\n", name, id);
 
   if (action == ACTION_CREATE) {
     server_info *sdata = g_new0(server_info, 1);
@@ -497,12 +490,10 @@ static void parse_message(struct im_connection *ic) {
       if (dd->ka_interval == 0) {
         dd->ka_interval = DEFAULT_KA_INTERVAL;
       }
-      g_print("Updated ka_interval to %u\n", dd->ka_interval);
     }
 
     json_value *user = json_o_get(data, "user");
     if (user != NULL && user->type == json_object) {
-      g_print("uinfo: name=%s; id=%s;\n", json_o_str(user, "username"), json_o_str(user, "id"));
       dd->id = json_o_strdup(user, "id");
       dd->uname = json_o_strdup(user, "username");
     }
@@ -522,7 +513,6 @@ static void parse_message(struct im_connection *ic) {
       for (int pcidx = 0; pcidx < pcs->u.array.length; pcidx++) {
         if (pcs->u.array.values[pcidx]->type == json_object) {
           json_value *pcinfo = pcs->u.array.values[pcidx];
-          g_print("pcinfo: name=%s; id=%s;\n", json_o_str(json_o_get(pcinfo, "recipient"), "username"), json_o_str(pcinfo, "id"));
 
           char *lmsg = (char *)json_o_str(pcinfo, "last_message_id");
 
@@ -572,7 +562,6 @@ static void parse_message(struct im_connection *ic) {
     handle_server(ic, sinfo, ACTION_DELETE);
   } else if (g_strcmp0(event, "MESSAGE_CREATE") == 0) {
     json_value *minfo = json_o_get(js, "d");
-    g_print("MSG: %s\n", dd->ws_buf->str);
 
     if (minfo == NULL || minfo->type != json_object) {
       goto exit;
@@ -631,62 +620,67 @@ discord_lws_http_only_cb(struct libwebsocket_context *this,
   discord_data *dd = ic->proto_data;
   switch(reason) {
     case LWS_CALLBACK_CLIENT_ESTABLISHED:
-      g_print("%s: client established\n", __func__);
       dd->state = WS_CONNECTED;
       libwebsocket_callback_on_writable(this, wsi);
       break;
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
-      g_print("%s: client connection error\n", __func__);
+      imcb_error(ic, "Websocket connection error");
+      if (in != NULL) {
+        imcb_error(ic, in);
+      }
       imc_logout(ic, FALSE);
       break;
     case LWS_CALLBACK_CLIENT_WRITEABLE:
-      g_print("%s: client writable\n", __func__);
       if (dd->state == WS_CONNECTED) {
         GString *buf = g_string_new("");
         g_string_printf(buf, "{\"d\":{\"v\":3,\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"}},\"op\":2}", dd->token);
         lws_send_payload(wsi, buf->str, buf->len);
         g_string_free(buf, TRUE);
+      } else {
+        g_print("%s: Unhandled writable callback\n", __func__);
       }
       break;
     case LWS_CALLBACK_CLIENT_RECEIVE:
       {
         size_t rpload = libwebsockets_remaining_packet_payload(wsi);
-        g_print("%s: client receive: %p %zd [%zd]\n", __func__, dd->ws_buf, len, rpload);
         if (dd->ws_buf == NULL) {
           dd->ws_buf = g_string_new("");
         }
         dd->ws_buf = g_string_append(dd->ws_buf, in);
         if (rpload == 0) {
-          //g_print("<<< %s\n", dd->ws_buf->str);
           parse_message(ic);
           g_string_free(dd->ws_buf, TRUE);
           dd->ws_buf = NULL;
         }
         break;
       }
-    case LWS_CALLBACK_CLIENT_CONFIRM_EXTENSION_SUPPORTED:
-      g_print("%s: client extension:\n%s\n", __func__, (char*)in);
-      break;
     case LWS_CALLBACK_CLOSED:
-      g_print("%s: closed\n", __func__);
       imc_logout(ic, TRUE);
       break;
     case LWS_CALLBACK_ADD_POLL_FD:
       {
         struct libwebsocket_pollargs *pargs = in;
-        g_print("%s: lws add loop: %d 0x%x\n", __func__, pargs->fd, pargs->events);
         dd->main_loop_id = b_input_add(pargs->fd, B_EV_IO_READ | B_EV_IO_WRITE,
                                        lws_service_loop, ic);
         break;
       }
     case LWS_CALLBACK_DEL_POLL_FD:
-      g_print("%s: lws remove loop: %d\n", __func__, dd->main_loop_id);
       b_event_remove(dd->main_loop_id);
       break;
+    case LWS_CALLBACK_CLIENT_CONFIRM_EXTENSION_SUPPORTED:
     case LWS_CALLBACK_CHANGE_MODE_POLL_FD:
     case LWS_CALLBACK_GET_THREAD_ID:
     case LWS_CALLBACK_LOCK_POLL:
     case LWS_CALLBACK_UNLOCK_POLL:
+    case LWS_CALLBACK_OPENSSL_LOAD_EXTRA_CLIENT_VERIFY_CERTS:
+    case LWS_CALLBACK_PROTOCOL_INIT:
+    case LWS_CALLBACK_PROTOCOL_DESTROY:
+    case LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER:
+    case LWS_CALLBACK_CLIENT_FILTER_PRE_ESTABLISH:
+    case LWS_CALLBACK_WSI_CREATE:
+    case LWS_CALLBACK_WSI_DESTROY:
+      // Ignoring these, this block should be removed when defult is set to
+      // stay silent.
       break;
     default:
       g_print("%s: unknown rsn=%d\n", __func__, reason);
@@ -723,7 +717,6 @@ static void discord_gateway_cb(struct http_request *req) {
       dd->gateway = g_strdup(gw);
     }
 
-    g_print("%s: gateway=%s\n", __func__, dd->gateway);
     struct lws_context_creation_info info;
     memset(&info, 0, sizeof(info));
     info.port = CONTEXT_PORT_NO_LISTEN;
@@ -736,7 +729,7 @@ static void discord_gateway_cb(struct http_request *req) {
     info.uid = -1;
     info.user = ic;
 
-    lws_set_log_level(255, NULL);
+    lws_set_log_level(0, NULL);
 
     dd->lwsctx = libwebsocket_create_context(&info);
     if (dd->lwsctx == NULL) {
