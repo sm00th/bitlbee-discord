@@ -95,6 +95,14 @@ typedef struct _cadd {
 static void discord_http_get(struct im_connection *ic, const char *api_path,
                              http_input_function cb_func, gpointer data);
 
+static void free_cadd(cadd *ca) {
+  g_free(ca->last_msg);
+  g_free(ca->topic);
+  g_free(ca->name);
+  g_free(ca->id);
+  g_free(ca);
+}
+
 static void free_user_info(user_info *uinfo) {
   g_free(uinfo->name);
   g_free(uinfo->id);
@@ -127,7 +135,8 @@ static void free_server_info(server_info *sinfo) {
 static void discord_logout(struct im_connection *ic) {
   discord_data *dd = ic->proto_data;
 
-  b_event_remove(dd->main_loop_id);
+  libwebsocket_cancel_service(dd->lwsctx);
+  libwebsocket_context_destroy(dd->lwsctx);
 
   g_slist_free_full(dd->pchannels, (GDestroyNotify)free_channel_info);
   g_slist_free_full(dd->servers, (GDestroyNotify)free_server_info);
@@ -332,6 +341,7 @@ static void handle_channel(struct im_connection *ic, json_value *cinfo,
 
       // TODO: Check access
       discord_add_channel(ca);
+      free_cadd(ca);
     }
   } else {
     channel_info *cdata = get_channel_by_id(dd, id, server_id);
@@ -427,7 +437,7 @@ static void parse_message(struct im_connection *ic) {
 
     json_value *user = json_o_get(data, "user");
     if (user != NULL && user->type == json_object) {
-      g_print("uinfo: name=%s; id=%s;\n", json_o_str(user, "username"), json_o_strdup(user, "id"));
+      g_print("uinfo: name=%s; id=%s;\n", json_o_str(user, "username"), json_o_str(user, "id"));
       dd->id = json_o_strdup(user, "id");
       dd->uname = json_o_strdup(user, "username");
     }
@@ -437,7 +447,7 @@ static void parse_message(struct im_connection *ic) {
       for (int gidx = 0; gidx < guilds->u.array.length; gidx++) {
         if (guilds->u.array.values[gidx]->type == json_object) {
           json_value *ginfo = guilds->u.array.values[gidx];
-          g_print("ginfo: name=%s; id=%s;\n", json_o_str(ginfo, "name"), json_o_strdup(ginfo, "id"));
+          g_print("ginfo: name=%s; id=%s;\n", json_o_str(ginfo, "name"), json_o_str(ginfo, "id"));
 
           server_info *sinfo = g_new0(server_info, 1);
 
@@ -479,7 +489,7 @@ static void parse_message(struct im_connection *ic) {
       for (int pcidx = 0; pcidx < pcs->u.array.length; pcidx++) {
         if (pcs->u.array.values[pcidx]->type == json_object) {
           json_value *pcinfo = pcs->u.array.values[pcidx];
-          g_print("pcinfo: name=%s; id=%s;\n", json_o_str(json_o_get(pcinfo, "recipient"), "username"), json_o_strdup(pcinfo, "id"));
+          g_print("pcinfo: name=%s; id=%s;\n", json_o_str(json_o_get(pcinfo, "recipient"), "username"), json_o_str(pcinfo, "id"));
 
           char *lmsg = (char *)json_o_str(pcinfo, "last_message_id");
 
