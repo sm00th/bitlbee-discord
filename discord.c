@@ -359,6 +359,45 @@ static void handle_channel(struct im_connection *ic, json_value *cinfo,
   }
 }
 
+static void handle_user(struct im_connection *ic, json_value *uinfo,
+                           const char *server_id, handler_action action) {
+
+  discord_data *dd = ic->proto_data;
+  server_info *sinfo = get_server_by_id(dd, server_id);
+
+  const char *id   = json_o_str(uinfo, "id");
+  const char *name = json_o_str(uinfo, "username");
+  g_print("[%x] uinfo: name=%s; id=%s;\n", action, name, id);
+
+  if (action == ACTION_CREATE) {
+    if (name && !bee_user_by_handle(ic->bee, ic, name)) {
+      user_info *ui = g_new0(user_info, 1);
+
+      imcb_add_buddy(ic, name, NULL);
+      imcb_buddy_status(ic, name, 0, NULL, NULL);
+
+      ui->user = bee_user_by_handle(ic->bee, ic, name);
+      ui->id = g_strdup(id);
+      ui->name = g_strdup(name);
+
+      sinfo->users = g_slist_prepend(sinfo->users, ui);
+    }
+  } else if (action == ACTION_DELETE) {
+    GSList *ul = g_slist_find_custom(sinfo->users, id,
+                                     (GCompareFunc)cmp_user_id);
+
+    if (ul == NULL) {
+      return;
+    }
+    user_info *udata = ul->data;
+    imcb_remove_buddy(ic, name, NULL);
+    sinfo->users = g_slist_remove(sinfo->users, udata);
+    free_user_info(udata);
+  }
+  // XXX: Should warn about unhandled action _UPDATE if we switch to some
+  // centralized handling solution.
+}
+
 static void parse_message(struct im_connection *ic) {
   discord_data *dd = ic->proto_data;
   json_value *js = json_parse(dd->ws_buf->str, dd->ws_buf->len);
@@ -420,22 +459,7 @@ static void parse_message(struct im_connection *ic) {
             for (int midx = 0; midx < members->u.array.length; midx++) {
               json_value *uinfo = json_o_get(members->u.array.values[midx],
                                              "user");
-
-              g_print("uinfo: name=%s; id=%s;\n", json_o_str(uinfo, "username"), json_o_strdup(uinfo, "id"));
-              const char *name = json_o_str(uinfo, "username");
-
-              if (name && !bee_user_by_handle(ic->bee, ic, name)) {
-                user_info *ui = g_new0(user_info, 1);
-
-                imcb_add_buddy(ic, name, NULL);
-                imcb_buddy_status(ic, name, 0, NULL, NULL);
-
-                ui->user = bee_user_by_handle(ic->bee, ic, name);
-                ui->id = json_o_strdup(uinfo, "id");
-                ui->name = json_o_strdup(uinfo, "username");
-
-                sinfo->users = g_slist_prepend(sinfo->users, ui);
-              }
+              handle_user(ic, uinfo, sinfo->id, ACTION_CREATE);
             }
           }
 
@@ -489,6 +513,14 @@ static void parse_message(struct im_connection *ic) {
   } else if (g_strcmp0(event, "CHANNEL_UPDATE") == 0) {
     json_value *cinfo = json_o_get(js, "d");
     handle_channel(ic, cinfo, json_o_str(cinfo, "guild_id"), ACTION_UPDATE);
+  } else if (g_strcmp0(event, "GUILD_MEMBER_ADD") == 0) {
+    json_value *data = json_o_get(js, "d");
+    handle_user(ic, json_o_get(data, "user"), json_o_str(data, "guild_id"),
+                ACTION_CREATE);
+  } else if (g_strcmp0(event, "GUILD_MEMBER_REMOVE") == 0) {
+    json_value *data = json_o_get(js, "d");
+    handle_user(ic, json_o_get(data, "user"), json_o_str(data, "guild_id"),
+                ACTION_DELETE);
   } else if (g_strcmp0(event, "MESSAGE_CREATE") == 0) {
     json_value *minfo = json_o_get(js, "d");
     g_print("MSG: %s\n", dd->ws_buf->str);
