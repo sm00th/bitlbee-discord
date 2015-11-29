@@ -323,6 +323,10 @@ static void handle_channel(struct im_connection *ic, json_value *cinfo,
   discord_data *dd = ic->proto_data;
   server_info *sinfo = get_server_by_id(dd, server_id);
 
+  if (sinfo == NULL) {
+    return;
+  }
+
   const char *id    = json_o_str(cinfo, "id");
   const char *name  = json_o_str(cinfo, "name");
   const char *type  = json_o_str(cinfo, "type");
@@ -371,9 +375,12 @@ static void handle_channel(struct im_connection *ic, json_value *cinfo,
 
 static void handle_user(struct im_connection *ic, json_value *uinfo,
                            const char *server_id, handler_action action) {
-
   discord_data *dd = ic->proto_data;
   server_info *sinfo = get_server_by_id(dd, server_id);
+
+  if (sinfo == NULL) {
+    return;
+  }
 
   const char *id   = json_o_str(uinfo, "id");
   const char *name = json_o_str(uinfo, "username");
@@ -406,6 +413,64 @@ static void handle_user(struct im_connection *ic, json_value *uinfo,
   }
   // XXX: Should warn about unhandled action _UPDATE if we switch to some
   // centralized handling solution.
+}
+
+static void handle_server(struct im_connection *ic, json_value *sinfo,
+                          handler_action action) {
+  discord_data *dd = ic->proto_data;
+
+  const char *id   = json_o_str(sinfo, "id");
+  const char *name = json_o_str(sinfo, "name");
+
+  g_print("sinfo: name=%s; id=%s;\n", name, id);
+
+  if (action == ACTION_CREATE) {
+    server_info *sdata = g_new0(server_info, 1);
+
+    sdata->name = g_strdup(name);
+    sdata->id = g_strdup(id);
+    sdata->ic = ic;
+    dd->servers = g_slist_prepend(dd->servers, sdata);
+
+    json_value *channels = json_o_get(sinfo, "channels");
+    if (channels != NULL && channels->type == json_array) {
+      for (int cidx = 0; cidx < channels->u.array.length; cidx++) {
+        json_value *cinfo = channels->u.array.values[cidx];
+        handle_channel(ic, cinfo, sdata->id, ACTION_CREATE);
+      }
+    }
+
+    json_value *members = json_o_get(sinfo, "members");
+    if (members != NULL && members->type == json_array) {
+      for (int midx = 0; midx < members->u.array.length; midx++) {
+        json_value *uinfo = json_o_get(members->u.array.values[midx],
+                                       "user");
+        handle_user(ic, uinfo, sdata->id, ACTION_CREATE);
+      }
+    }
+
+    json_value *presences = json_o_get(sinfo, "presences");
+    if (presences != NULL && presences->type == json_array) {
+      for (int pidx = 0; pidx < presences->u.array.length; pidx++) {
+        json_value *pinfo = presences->u.array.values[pidx];
+        handle_presence(ic, pinfo, sdata->id);
+      }
+    }
+  } else {
+    server_info *sdata = get_server_by_id(dd, id);
+    if (sdata == NULL) {
+      return;
+    }
+
+    if (action == ACTION_DELETE) {
+      for (GSList *ul = sdata->users; ul; ul = g_slist_next(ul)) {
+        user_info *uinfo = ul->data;
+        imcb_remove_buddy(ic, uinfo->name, NULL);
+      }
+      dd->servers = g_slist_remove(dd->servers, sdata);
+      free_server_info(sdata);
+    }
+  }
 }
 
 static void parse_message(struct im_connection *ic) {
@@ -447,39 +512,7 @@ static void parse_message(struct im_connection *ic) {
       for (int gidx = 0; gidx < guilds->u.array.length; gidx++) {
         if (guilds->u.array.values[gidx]->type == json_object) {
           json_value *ginfo = guilds->u.array.values[gidx];
-          g_print("ginfo: name=%s; id=%s;\n", json_o_str(ginfo, "name"), json_o_str(ginfo, "id"));
-
-          server_info *sinfo = g_new0(server_info, 1);
-
-          sinfo->name = json_o_strdup(ginfo, "name");
-          sinfo->id = json_o_strdup(ginfo, "id");
-          sinfo->ic = ic;
-          dd->servers = g_slist_prepend(dd->servers, sinfo);
-
-          json_value *channels = json_o_get(ginfo, "channels");
-          if (channels != NULL && channels->type == json_array) {
-            for (int cidx = 0; cidx < channels->u.array.length; cidx++) {
-              json_value *cinfo = channels->u.array.values[cidx];
-              handle_channel(ic, cinfo, sinfo->id, ACTION_CREATE);
-            }
-          }
-
-          json_value *members = json_o_get(ginfo, "members");
-          if (members != NULL && members->type == json_array) {
-            for (int midx = 0; midx < members->u.array.length; midx++) {
-              json_value *uinfo = json_o_get(members->u.array.values[midx],
-                                             "user");
-              handle_user(ic, uinfo, sinfo->id, ACTION_CREATE);
-            }
-          }
-
-          json_value *presences = json_o_get(ginfo, "presences");
-          if (presences != NULL && presences->type == json_array) {
-            for (int pidx = 0; pidx < presences->u.array.length; pidx++) {
-              json_value *pinfo = presences->u.array.values[pidx];
-              handle_presence(ic, pinfo, sinfo->id);
-            }
-          }
+          handle_server(ic, ginfo, ACTION_CREATE);
         }
       }
     }
@@ -531,6 +564,12 @@ static void parse_message(struct im_connection *ic) {
     json_value *data = json_o_get(js, "d");
     handle_user(ic, json_o_get(data, "user"), json_o_str(data, "guild_id"),
                 ACTION_DELETE);
+  } else if (g_strcmp0(event, "GUILD_CREATE") == 0) {
+    json_value *sinfo = json_o_get(js, "d");
+    handle_server(ic, sinfo, ACTION_CREATE);
+  } else if (g_strcmp0(event, "GUILD_DELETE") == 0) {
+    json_value *sinfo = json_o_get(js, "d");
+    handle_server(ic, sinfo, ACTION_DELETE);
   } else if (g_strcmp0(event, "MESSAGE_CREATE") == 0) {
     json_value *minfo = json_o_get(js, "d");
     g_print("MSG: %s\n", dd->ws_buf->str);
