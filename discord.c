@@ -628,7 +628,7 @@ discord_lws_http_only_cb(struct libwebsocket_context *this,
       if (in != NULL) {
         imcb_error(ic, in);
       }
-      imc_logout(ic, FALSE);
+      imc_logout(ic, TRUE);
       break;
     case LWS_CALLBACK_CLIENT_WRITEABLE:
       if (dd->state == WS_CONNECTED) {
