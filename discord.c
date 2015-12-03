@@ -669,15 +669,28 @@ discord_lws_http_only_cb(struct libwebsocket_context *this,
     case LWS_CALLBACK_ADD_POLL_FD:
       {
         struct libwebsocket_pollargs *pargs = in;
-        dd->main_loop_id = b_input_add(pargs->fd, B_EV_IO_READ | B_EV_IO_WRITE,
+        dd->main_loop_id = b_input_add(pargs->fd, B_EV_IO_READ,
                                        lws_service_loop, ic);
         break;
       }
     case LWS_CALLBACK_DEL_POLL_FD:
       b_event_remove(dd->main_loop_id);
       break;
-    case LWS_CALLBACK_CLIENT_CONFIRM_EXTENSION_SUPPORTED:
     case LWS_CALLBACK_CHANGE_MODE_POLL_FD:
+      {
+        struct libwebsocket_pollargs *pargs = in;
+        int flags = 0;
+        b_event_remove(dd->main_loop_id);
+        if (pargs->events & POLLIN) {
+          flags |= B_EV_IO_READ;
+        }
+        if (pargs->events & POLLOUT) {
+          flags |= B_EV_IO_WRITE;
+        }
+        dd->main_loop_id = b_input_add(pargs->fd, flags, lws_service_loop, ic);
+        break;
+      }
+    case LWS_CALLBACK_CLIENT_CONFIRM_EXTENSION_SUPPORTED:
     case LWS_CALLBACK_GET_THREAD_ID:
     case LWS_CALLBACK_LOCK_POLL:
     case LWS_CALLBACK_UNLOCK_POLL:
