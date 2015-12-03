@@ -29,7 +29,8 @@ typedef enum {
   WS_IDLE,
   WS_CONNECTING,
   WS_CONNECTED,
-  WS_READY
+  WS_READY,
+  WS_CLOSING,
 } ws_state;
 
 typedef enum {
@@ -136,7 +137,6 @@ static void discord_logout(struct im_connection *ic) {
   discord_data *dd = ic->proto_data;
 
   if (dd->lwsctx != NULL) {
-    libwebsocket_cancel_service(dd->lwsctx);
     libwebsocket_context_destroy(dd->lwsctx);
   }
 
@@ -226,6 +226,10 @@ static gboolean lws_service_loop(gpointer data, gint fd,
   discord_data *dd = ic->proto_data;
 
   libwebsocket_service(dd->lwsctx, 0);
+
+  if (dd->state == WS_CLOSING) {
+    imc_logout(ic, TRUE);
+  }
 
   return TRUE;
 }
@@ -630,7 +634,8 @@ discord_lws_http_only_cb(struct libwebsocket_context *this,
       if (in != NULL) {
         imcb_error(ic, in);
       }
-      imc_logout(ic, TRUE);
+      b_event_remove(dd->ka_loop_id);
+      dd->state = WS_CLOSING;
       break;
     case LWS_CALLBACK_CLIENT_WRITEABLE:
       if (dd->state == WS_CONNECTED) {
@@ -664,7 +669,8 @@ discord_lws_http_only_cb(struct libwebsocket_context *this,
       }
     case LWS_CALLBACK_CLOSED:
       b_event_remove(dd->ka_loop_id);
-      imc_logout(ic, TRUE);
+      dd->state = WS_CLOSING;
+      libwebsocket_cancel_service(dd->lwsctx);
       break;
     case LWS_CALLBACK_ADD_POLL_FD:
       {
