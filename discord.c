@@ -23,7 +23,7 @@
 #include <bitlbee/json_util.h>
 
 #define DISCORD_HOST "discordapp.com"
-#define DEFAULT_KA_INTERVAL 30
+#define DEFAULT_KA_INTERVAL 30000
 
 typedef enum {
   WS_IDLE,
@@ -50,8 +50,8 @@ typedef struct _discord_data {
   gint     main_loop_id;
   GString  *ws_buf;
   ws_state state;
-  guint32  ka_interval;
-  time_t   ka_timestamp;
+  gint     ka_interval;
+  gint     ka_loop_id;
 } discord_data;
 
 typedef struct _server_info {
@@ -208,16 +208,15 @@ static channel_info *get_channel_by_id(discord_data *dd, const char *channel_id,
   return cl == NULL ?  NULL : cl->data;
 }
 
-static void lws_send_keepalive(discord_data *dd) {
-  time_t ctime = time(NULL);
-  if (ctime - dd->ka_timestamp > dd->ka_interval) {
-    GString *buf = g_string_new("");
+static gboolean lws_ka_loop(gpointer data, gint fd,
+                                 b_input_condition cond) {
+  struct im_connection *ic = data;
+  discord_data *dd = ic->proto_data;
 
-    g_string_printf(buf, "{\"op\":1,\"d\":%tu}", ctime);
-    lws_send_payload(dd->lws, buf->str, buf->len);
-    g_string_free(buf, TRUE);
-    dd->ka_timestamp = ctime;
+  if (dd->state == WS_READY) {
+    libwebsocket_callback_on_writable(dd->lwsctx, dd->lws);
   }
+  return TRUE;
 }
 
 static gboolean lws_service_loop(gpointer data, gint fd,
@@ -227,9 +226,7 @@ static gboolean lws_service_loop(gpointer data, gint fd,
   discord_data *dd = ic->proto_data;
 
   libwebsocket_service(dd->lwsctx, 0);
-  if (dd->state == WS_READY) {
-    lws_send_keepalive(dd);
-  }
+
   return TRUE;
 }
 
@@ -489,11 +486,12 @@ static void parse_message(struct im_connection *ic) {
 
     json_value *hbeat = json_o_get(data, "heartbeat_interval");
     if (hbeat != NULL && hbeat->type == json_integer) {
-      dd->ka_interval = hbeat->u.integer / 1000;
+      dd->ka_interval = hbeat->u.integer;
       if (dd->ka_interval == 0) {
         dd->ka_interval = DEFAULT_KA_INTERVAL;
       }
     }
+    dd->ka_loop_id = b_timeout_add(dd->ka_interval, lws_ka_loop, ic);
 
     json_value *user = json_o_get(data, "user");
     if (user != NULL && user->type == json_object) {
@@ -640,6 +638,12 @@ discord_lws_http_only_cb(struct libwebsocket_context *this,
         g_string_printf(buf, "{\"d\":{\"v\":3,\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"}},\"op\":2}", dd->token);
         lws_send_payload(wsi, buf->str, buf->len);
         g_string_free(buf, TRUE);
+      } else if (dd->state == WS_READY) {
+        GString *buf = g_string_new("");
+
+        g_string_printf(buf, "{\"op\":1,\"d\":%tu}", time(NULL));
+        lws_send_payload(dd->lws, buf->str, buf->len);
+        g_string_free(buf, TRUE);
       } else {
         g_print("%s: Unhandled writable callback\n", __func__);
       }
@@ -659,6 +663,7 @@ discord_lws_http_only_cb(struct libwebsocket_context *this,
         break;
       }
     case LWS_CALLBACK_CLOSED:
+      b_event_remove(dd->ka_loop_id);
       imc_logout(ic, TRUE);
       break;
     case LWS_CALLBACK_ADD_POLL_FD:
