@@ -135,8 +135,10 @@ static void free_server_info(server_info *sinfo) {
 static void discord_logout(struct im_connection *ic) {
   discord_data *dd = ic->proto_data;
 
-  libwebsocket_cancel_service(dd->lwsctx);
-  libwebsocket_context_destroy(dd->lwsctx);
+  if (dd->lwsctx != NULL) {
+    libwebsocket_cancel_service(dd->lwsctx);
+    libwebsocket_context_destroy(dd->lwsctx);
+  }
 
   g_slist_free_full(dd->pchannels, (GDestroyNotify)free_channel_info);
   g_slist_free_full(dd->servers, (GDestroyNotify)free_server_info);
@@ -221,6 +223,7 @@ static void lws_send_keepalive(discord_data *dd) {
 static gboolean lws_service_loop(gpointer data, gint fd,
                                  b_input_condition cond) {
   struct im_connection *ic = data;
+
   discord_data *dd = ic->proto_data;
 
   libwebsocket_service(dd->lwsctx, 0);
@@ -617,6 +620,7 @@ discord_lws_http_only_cb(struct libwebsocket_context *this,
                          enum libwebsocket_callback_reasons reason,
                          void *user, void *in, size_t len) {
   struct im_connection *ic = libwebsocket_context_user(this);
+
   discord_data *dd = ic->proto_data;
   switch(reason) {
     case LWS_CALLBACK_CLIENT_ESTABLISHED:
