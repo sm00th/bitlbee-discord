@@ -1,0 +1,34 @@
+Discord protocol plugin for bitlbee.
+
+Build dependencies
+------------------
+- bitlbee and headers
+  If using distribution version of bitlbee you will need to install the dev
+  package, usually bitlbee-dev or bitlbee-devel. If bitlbee was built from
+  source don't forget to do `make install-dev`.
+
+- libwebsockets >= 1.5 and headers (https://libwebsockets.org)
+  Archlinux users can use libwebsocket-git from AUR, others are out of luck and
+  will have to build it from source for now, debian's version in sid is too old
+  (1.2), fedora23 doesn't provide this package at all.
+
+Building and Installing
+-----------------------
+The process is extremely dumb for now, so it is just:
+
+  $ make && sudo make install
+
+This will build the discord.so file and put it into /usr/lib/bitlbee directory,
+if your bitlbee's plugindir is somewhere else you'll have to move it manually.
+
+Usage
+-----
+Plugint adds 'discord' protocol to bitlbee, add your account as usual:
+
+  > account add discord <email> <password>
+  > account discord on
+
+Bugs
+----
+Plugin is in early development stages, so there should be plenty, please report
+them at github: https://github.com/sm00th/bitlbee-discord/issues
