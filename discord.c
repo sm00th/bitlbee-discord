@@ -601,8 +601,29 @@ static void parse_message(struct im_connection *ic) {
         }
       } else {
         struct groupchat *gc = cinfo->to.channel.gc;
+        gchar *msg = json_o_strdup(minfo, "content");
+        json_value *mentions = json_o_get(minfo, "mentions");
+        if (mentions != NULL && mentions->type == json_array) {
+          for (int midx = 0; midx < mentions->u.array.length; midx++) {
+            json_value *uinfo = mentions->u.array.values[midx];
+            gchar *newmsg = NULL;
+            gchar *idstr = g_strdup_printf("<@%s>", json_o_str(uinfo, "id"));
+            gchar *unstr = g_strdup_printf("@%s",
+                                           json_o_str(uinfo, "username"));
+            GRegex *regex = g_regex_new(idstr, 0, 0, NULL);
+            newmsg = g_regex_replace_literal(regex, msg, -1, 0,
+                                             unstr, 0, NULL);
+            g_free(msg);
+            msg = newmsg;
+            g_regex_unref(regex);
+            g_free(idstr);
+            g_free(unstr);
+          }
+        }
+
         imcb_chat_msg(gc, json_o_str(json_o_get(minfo, "author"), "username"),
-                      (char *)json_o_str(minfo, "content"), 0, 0);
+                      msg, 0, 0);
+        g_free(msg);
       }
       cinfo->last_msg = msgid;
     }
