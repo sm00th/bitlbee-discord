@@ -103,7 +103,7 @@ discord_ws_callback(struct libwebsocket_context *this,
       break;
     case LWS_CALLBACK_ADD_POLL_FD:
       {
-        struct libwebsocket_pollargs *pargs = in;
+        struct lws_pollargs *pargs = in;
         dd->main_loop_id = b_input_add(pargs->fd, B_EV_IO_READ,
                                        discord_ws_service_loop, ic);
         break;
@@ -113,7 +113,7 @@ discord_ws_callback(struct libwebsocket_context *this,
       break;
     case LWS_CALLBACK_CHANGE_MODE_POLL_FD:
       {
-        struct libwebsocket_pollargs *pargs = in;
+        struct lws_pollargs *pargs = in;
         int flags = 0;
         b_event_remove(dd->main_loop_id);
         if (pargs->events & POLLIN) {
