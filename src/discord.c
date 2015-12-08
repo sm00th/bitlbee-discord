@@ -51,7 +51,7 @@ static void discord_chat_msg(struct groupchat *gc, char *msg, int flags)
 {
   channel_info *cinfo = gc->data;
 
-  discord_http_send_msg(cinfo->to.channel.gc->ic, cinfo->id, msg);
+  discord_http_send_msg(gc->ic, cinfo->id, msg);
 }
 
 static int discord_buddy_msg(struct im_connection *ic, char *to, char *msg,
@@ -61,7 +61,8 @@ static int discord_buddy_msg(struct im_connection *ic, char *to, char *msg,
 
   for (GSList *cl = dd->pchannels; cl; cl = g_slist_next(cl)) {
     channel_info *cinfo = cl->data;
-    if (cinfo->is_private && g_strcmp0(cinfo->to.user.handle, to) == 0) {
+    if (cinfo->type == CHANNEL_PRIVATE &&
+        g_strcmp0(cinfo->to.handle.name, to) == 0) {
       discord_http_send_msg(ic, cinfo->id, msg);
       return 0;
     }

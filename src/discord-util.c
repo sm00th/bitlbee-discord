@@ -12,8 +12,8 @@ void free_channel_info(channel_info *cinfo)
   g_free(cinfo->id);
   cinfo->id = NULL;
 
-  if (cinfo->is_private) {
-    g_free(cinfo->to.user.handle);
+  if (cinfo->type != CHANNEL_TEXT) {
+    g_free(cinfo->to.handle.name);
   } else {
     imcb_chat_free(cinfo->to.channel.gc);
   }

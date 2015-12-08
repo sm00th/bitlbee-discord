@@ -14,6 +14,12 @@ typedef enum {
   WS_CLOSING,
 } ws_state;
 
+typedef enum {
+  CHANNEL_TEXT,
+  CHANNEL_VOICE,
+  CHANNEL_PRIVATE
+} channel_type;
+
 typedef struct _discord_data {
   char     *token;
   char     *id;
@@ -47,11 +53,11 @@ typedef struct _channel_info {
       server_info          *sinfo;
     } channel;
     struct {
-      char                 *handle;
+      char                 *name;
       struct im_connection *ic;
-    } user;
+    } handle;
   } to;
-  gboolean             is_private;
+  channel_type         type;
 } channel_info;
 
 typedef struct _user_info {

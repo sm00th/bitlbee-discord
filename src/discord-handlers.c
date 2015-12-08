@@ -40,11 +40,13 @@ static void discord_handle_presence(struct im_connection *ic,
     for (GSList *cl = sinfo->channels; cl; cl = g_slist_next(cl)) {
       channel_info *cinfo = cl->data;
 
-      if (flags) {
-        imcb_chat_add_buddy(cinfo->to.channel.gc, uinfo->user->handle);
-      } else {
-        imcb_chat_remove_buddy(cinfo->to.channel.gc, uinfo->user->handle,
-                               NULL);
+      if (cinfo->type == CHANNEL_TEXT) {
+        if (flags) {
+          imcb_chat_add_buddy(cinfo->to.channel.gc, uinfo->user->handle);
+        } else {
+          imcb_chat_remove_buddy(cinfo->to.channel.gc, uinfo->user->handle,
+                                 NULL);
+        }
       }
     }
 
@@ -91,7 +93,7 @@ static void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
       imcb_chat_add_buddy(gc, dd->uname);
 
       channel_info *cinfo = g_new0(channel_info, 1);
-      cinfo->is_private = FALSE;
+      cinfo->type = CHANNEL_TEXT;
       cinfo->to.channel.gc = gc;
       cinfo->to.channel.sinfo = sinfo;
       cinfo->id = g_strdup(id);
@@ -100,6 +102,15 @@ static void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
       }
 
       gc->data = cinfo;
+
+      sinfo->channels = g_slist_prepend(sinfo->channels, cinfo);
+    } else if (g_strcmp0(type, "voice") == 0) {
+      channel_info *cinfo = g_new0(channel_info, 1);
+      cinfo->type = CHANNEL_VOICE;
+      cinfo->last_msg = 0;
+      cinfo->to.handle.name = g_strdup(name);
+      cinfo->id = g_strdup(id);
+      cinfo->to.handle.ic = ic;
 
       sinfo->channels = g_slist_prepend(sinfo->channels, cinfo);
     }
@@ -111,7 +122,7 @@ static void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
 
     if (action == ACTION_DELETE) {
       GSList *clist;
-      if (cdata->is_private == TRUE) {
+      if (cdata->type == CHANNEL_PRIVATE) {
         clist = dd->pchannels;
       } else {
         clist = sinfo->channels;
@@ -120,7 +131,7 @@ static void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
       clist = g_slist_remove(clist, cdata);
       free_channel_info(cdata);
     } else if (action == ACTION_UPDATE) {
-      if (cdata->is_private == FALSE) {
+      if (cdata->type == CHANNEL_TEXT) {
         if (g_strcmp0(topic, cdata->to.channel.gc->topic) != 0) {
           imcb_chat_topic(cdata->to.channel.gc, "root", (char*)topic, 0);
         }
@@ -283,14 +294,14 @@ void discord_parse_message(struct im_connection *ic)
           char *lmsg = (char *)json_o_str(pcinfo, "last_message_id");
 
           channel_info *ci = g_new0(channel_info, 1);
-          ci->is_private = TRUE;
+          ci->type = CHANNEL_PRIVATE;
           if (lmsg != NULL) {
             ci->last_msg = g_ascii_strtoull(lmsg, NULL, 10);
           }
-          ci->to.user.handle = json_o_strdup(json_o_get(pcinfo, "recipient"),
-                     "username");
+          ci->to.handle.name = json_o_strdup(json_o_get(pcinfo, "recipient"),
+                                             "username");
           ci->id = json_o_strdup(pcinfo, "id");
-          ci->to.user.ic = ic;
+          ci->to.handle.ic = ic;
 
           dd->pchannels = g_slist_prepend(dd->pchannels, ci);
         }
@@ -356,14 +367,14 @@ void discord_parse_message(struct im_connection *ic)
     channel_info *cinfo = cl->data;
 
     if (msgid > cinfo->last_msg) {
-      if (cinfo->is_private) {
+      if (cinfo->type == CHANNEL_PRIVATE) {
         if (!g_strcmp0(json_o_str(json_o_get(minfo, "author"), "username"),
-                 cinfo->to.user.handle)) {
-          imcb_buddy_msg(cinfo->to.user.ic,
-                         cinfo->to.user.handle,
+                 cinfo->to.handle.name)) {
+          imcb_buddy_msg(cinfo->to.handle.ic,
+                         cinfo->to.handle.name,
                          (char *)json_o_str(minfo, "content"), 0, 0);
         }
-      } else {
+      } else if (cinfo->type == CHANNEL_TEXT) {
         struct groupchat *gc = cinfo->to.channel.gc;
         gchar *msg = json_o_strdup(minfo, "content");
         json_value *mentions = json_o_get(minfo, "mentions");
