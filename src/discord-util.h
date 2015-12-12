@@ -1,10 +1,9 @@
 #include "discord.h"
 
-gint cmp_chan_id(const channel_info *cinfo, const char *chan_id);
-gint cmp_user_id(const user_info *uinfo, const char *user_id);
-
 channel_info *get_channel_by_id(discord_data *dd, const char *channel_id,
                                 const char *server_id);
+user_info *get_user_by_id(discord_data *dd, const char *user_id,
+                          const char *server_id);
 server_info *get_server_by_id(discord_data *dd, const char *server_id);
 
 void free_channel_info(channel_info *cinfo);

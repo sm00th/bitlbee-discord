@@ -45,12 +45,12 @@ void free_discord_data(discord_data *dd)
   g_free(dd);
 }
 
-gint cmp_chan_id(const channel_info *cinfo, const char *chan_id)
+static gint cmp_chan_id(const channel_info *cinfo, const char *chan_id)
 {
   return g_strcmp0(cinfo->id, chan_id);
 }
 
-gint cmp_user_id(const user_info *uinfo, const char *user_id)
+static gint cmp_user_id(const user_info *uinfo, const char *user_id)
 {
   return g_strcmp0(uinfo->id, user_id);
 }
@@ -74,12 +74,36 @@ channel_info *get_channel_by_id(discord_data *dd, const char *channel_id,
   GSList *cl = g_slist_find_custom(dd->pchannels, channel_id,
                                    (GCompareFunc)cmp_chan_id);
 
-  if (cl == NULL && server_id != NULL) {
-    server_info *sinfo = get_server_by_id(dd, server_id);
-    cl = g_slist_find_custom(sinfo->channels, channel_id,
-                             (GCompareFunc)cmp_chan_id);
+  if (cl == NULL) {
+    if (server_id != NULL) {
+      server_info *sinfo = get_server_by_id(dd, server_id);
+      cl = g_slist_find_custom(sinfo->channels, channel_id,
+                               (GCompareFunc)cmp_chan_id);
+    } else {
+      for (GSList *sl = dd->servers; sl; sl = g_slist_next(sl)) {
+        server_info *sinfo = sl->data;
+        cl = g_slist_find_custom(sinfo->channels, channel_id,
+                                 (GCompareFunc)cmp_chan_id);
+        if (cl != NULL) {
+          break;
+        }
+      }
+    }
   }
 
   return cl == NULL ?  NULL : cl->data;
 }
 
+user_info *get_user_by_id(discord_data *dd, const char *user_id,
+                          const char *server_id)
+{
+  GSList *ul = NULL;
+
+  if (server_id != NULL) {
+    server_info *sinfo = get_server_by_id(dd, server_id);
+    ul = g_slist_find_custom(sinfo->users, user_id,
+                             (GCompareFunc)cmp_user_id);
+  }
+
+  return ul == NULL ?  NULL : ul->data;
+}

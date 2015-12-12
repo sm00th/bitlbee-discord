@@ -15,43 +15,41 @@ static void discord_handle_presence(struct im_connection *ic,
     return;
   }
 
-  GSList *ul = g_slist_find_custom(sinfo->users,
-                                   json_o_str(
-                                     json_o_get(pinfo, "user"),
-                                     "id"),
-                                   (GCompareFunc)cmp_user_id);
+  user_info *uinfo = get_user_by_id(dd, json_o_str(json_o_get(pinfo, "user"),
+                                    "id"), server_id);
 
-  if (ul != NULL) {
-    user_info *uinfo = (user_info*)ul->data;
-    const char *status = json_o_str(pinfo, "status");
-    int flags = 0;
+  if (uinfo == NULL) {
+    return;
+  }
 
-    if (uinfo->user->ic != ic ||
-        g_strcmp0(uinfo->user->handle, dd->uname) == 0) {
-      return;
-    }
+  const char *status = json_o_str(pinfo, "status");
+  int flags = 0;
 
-    if (g_strcmp0(status, "online") == 0) {
-      flags = BEE_USER_ONLINE;
-    } else if (g_strcmp0(status, "idle") == 0) {
-      flags = BEE_USER_ONLINE | BEE_USER_AWAY;
-    }
+  if (uinfo->user->ic != ic ||
+      g_strcmp0(uinfo->user->handle, dd->uname) == 0) {
+    return;
+  }
 
-    for (GSList *cl = sinfo->channels; cl; cl = g_slist_next(cl)) {
-      channel_info *cinfo = cl->data;
+  if (g_strcmp0(status, "online") == 0) {
+    flags = BEE_USER_ONLINE;
+  } else if (g_strcmp0(status, "idle") == 0) {
+    flags = BEE_USER_ONLINE | BEE_USER_AWAY;
+  }
 
-      if (cinfo->type == CHANNEL_TEXT) {
-        if (flags) {
-          imcb_chat_add_buddy(cinfo->to.channel.gc, uinfo->user->handle);
-        } else {
-          imcb_chat_remove_buddy(cinfo->to.channel.gc, uinfo->user->handle,
-                                 NULL);
-        }
+  for (GSList *cl = sinfo->channels; cl; cl = g_slist_next(cl)) {
+    channel_info *cinfo = cl->data;
+
+    if (cinfo->type == CHANNEL_TEXT) {
+      if (flags) {
+        imcb_chat_add_buddy(cinfo->to.channel.gc, uinfo->user->handle);
+      } else {
+        imcb_chat_remove_buddy(cinfo->to.channel.gc, uinfo->user->handle,
+                               NULL);
       }
     }
-
-    imcb_buddy_status(ic, uinfo->name, flags, NULL, NULL);
   }
+
+  imcb_buddy_status(ic, uinfo->name, flags, NULL, NULL);
 }
 
 static void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
@@ -168,13 +166,11 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
       sinfo->users = g_slist_prepend(sinfo->users, ui);
     }
   } else if (action == ACTION_DELETE) {
-    GSList *ul = g_slist_find_custom(sinfo->users, id,
-                                     (GCompareFunc)cmp_user_id);
+    user_info *udata = get_user_by_id(dd, id, server_id);
 
-    if (ul == NULL) {
+    if (udata == NULL) {
       return;
     }
-    user_info *udata = ul->data;
     imcb_remove_buddy(ic, name, NULL);
     sinfo->users = g_slist_remove(sinfo->users, udata);
     free_user_info(udata);
@@ -349,22 +345,11 @@ void discord_parse_message(struct im_connection *ic)
 
     guint64 msgid = g_ascii_strtoull(json_o_str(minfo, "id"), NULL, 10);
     const char *channel_id = json_o_str(minfo, "channel_id");
-    GSList *cl = g_slist_find_custom(dd->pchannels, channel_id,
-                                     (GCompareFunc)cmp_chan_id);
-    if (cl == NULL) {
-      for (GSList *sl = dd->servers; sl; sl = g_slist_next(sl)) {
-        server_info *sinfo = sl->data;
-        cl = g_slist_find_custom(sinfo->channels, channel_id,
-                                 (GCompareFunc)cmp_chan_id);
-        if (cl != NULL) {
-          break;
-        }
-      }
-      if (cl == NULL) {
-        goto exit;
-      }
+
+    channel_info *cinfo = get_channel_by_id(dd, channel_id, NULL);
+    if (cinfo == NULL) {
+      goto exit;
     }
-    channel_info *cinfo = cl->data;
 
     if (msgid > cinfo->last_msg) {
       if (cinfo->type == CHANNEL_PRIVATE) {
