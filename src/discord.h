@@ -63,6 +63,7 @@ typedef struct _channel_info {
 typedef struct _user_info {
   char                 *id;
   char                 *name;
+  channel_info         *voice_channel;
   bee_user_t           *user;
 } user_info;
 

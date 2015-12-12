@@ -5,6 +5,39 @@
 #include "discord-handlers.h"
 #include "discord-websockets.h"
 
+static void discord_handle_voice_state(struct im_connection *ic,
+                                       json_value *vsinfo,
+                                       const char *server_id)
+{
+  discord_data *dd = ic->proto_data;
+  server_info *sinfo = get_server_by_id(dd, server_id);
+
+  if (sinfo == NULL) {
+    return;
+  }
+
+  user_info *uinfo = get_user_by_id(dd, json_o_str(vsinfo, "user_id"),
+                                    server_id);
+
+  if (uinfo == NULL) {
+    return;
+  }
+
+  const char *channel_id = json_o_str(vsinfo, "channel_id");
+
+  if (channel_id == NULL) {
+    uinfo->voice_channel = NULL;
+    return;
+  }
+
+  channel_info *cinfo = get_channel_by_id(dd, channel_id, server_id);
+  if (cinfo == NULL) {
+    return;
+  }
+
+  uinfo->voice_channel = cinfo;
+}
+
 static void discord_handle_presence(struct im_connection *ic,
                                     json_value *pinfo, const char *server_id)
 {
@@ -219,6 +252,14 @@ static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
         discord_handle_presence(ic, pinfo, sdata->id);
       }
     }
+
+    json_value *vstates = json_o_get(sinfo, "voice_states");
+    if (vstates != NULL && vstates->type == json_array) {
+      for (int vidx = 0; vidx < vstates->u.array.length; vidx++) {
+        json_value *vsinfo = vstates->u.array.values[vidx];
+        discord_handle_voice_state(ic, vsinfo, sdata->id);
+      }
+    }
   } else {
     server_info *sdata = get_server_by_id(dd, id);
     if (sdata == NULL) {
@@ -307,6 +348,9 @@ void discord_parse_message(struct im_connection *ic)
     imcb_connected(ic);
   } else if (g_strcmp0(event, "TYPING_START") == 0) {
     // Ignoring those for now
+  } else if (g_strcmp0(event, "VOICE_STATE_UPDATE") == 0) {
+    json_value *vsinfo = json_o_get(js, "d");
+    discord_handle_voice_state(ic, vsinfo, json_o_str(vsinfo, "guild_id"));
   } else if (g_strcmp0(event, "PRESENCE_UPDATE") == 0) {
     json_value *pinfo = json_o_get(js, "d");
     discord_handle_presence(ic, pinfo, json_o_str(pinfo, "guild_id"));
