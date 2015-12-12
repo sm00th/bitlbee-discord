@@ -19,7 +19,7 @@ static void discord_handle_voice_state(struct im_connection *ic,
   user_info *uinfo = get_user_by_id(dd, json_o_str(vsinfo, "user_id"),
                                     server_id);
 
-  if (uinfo == NULL) {
+  if (uinfo == NULL || g_strcmp0(uinfo->id, dd->id) == 0) {
     return;
   }
 
@@ -34,7 +34,8 @@ static void discord_handle_voice_state(struct im_connection *ic,
   }
 
   channel_info *cinfo = get_channel_by_id(dd, channel_id, server_id);
-  if (cinfo == NULL || cinfo->type != CHANNEL_VOICE) {
+  if (cinfo == NULL || cinfo->type != CHANNEL_VOICE ||
+      cinfo == uinfo->voice_channel) {
     return;
   }
 
