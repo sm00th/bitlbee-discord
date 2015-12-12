@@ -27,15 +27,22 @@ static void discord_handle_voice_state(struct im_connection *ic,
 
   if (channel_id == NULL) {
     uinfo->voice_channel = NULL;
+    if (set_getbool(&ic->acc->set, "voice_status_notify") == TRUE) {
+      imcb_log(ic, "User %s is no longer in any voice channel.", uinfo->name);
+    }
     return;
   }
 
   channel_info *cinfo = get_channel_by_id(dd, channel_id, server_id);
-  if (cinfo == NULL) {
+  if (cinfo == NULL || cinfo->type != CHANNEL_VOICE) {
     return;
   }
 
   uinfo->voice_channel = cinfo;
+  if (set_getbool(&ic->acc->set, "voice_status_notify") == TRUE) {
+    imcb_log(ic, "User %s switched to voice channel '%s'.", uinfo->name,
+             cinfo->to.handle.name);
+  }
 }
 
 static void discord_handle_presence(struct im_connection *ic,

@@ -25,6 +25,8 @@ static void discord_init(account_t *acc)
 
   s = set_add(&acc->set, "host", DISCORD_HOST, NULL, acc);
   s->flags |= ACC_SET_OFFLINE_ONLY;
+
+  s = set_add(&acc->set, "voice_status_notify", "off", set_eval_bool, acc);
 }
 
 static void discord_login(account_t *acc)

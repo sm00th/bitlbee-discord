@@ -28,6 +28,19 @@ Plugint adds 'discord' protocol to bitlbee, add your account as usual:
   > account add discord <email> <password>
   > account discord on
 
+Options
+-------
+This section describes options available throug "account set" bitlbee command
+(for help on usage of this command see "help account set").
+
+  - host (type: string; default: discordapp.com)
+    Discord server hostname. Just in case discord changes the hostname or there
+    are some alternatives with compatible API.
+
+  - voice_status_notify (type: boolean; default: no)
+    This enables text notifications in your control channel about users
+    changing/leaving voice channels. Can be noisy on big servers.
+
 Bugs
 ----
 Plugin is in early development stages, so there should be plenty, please report
