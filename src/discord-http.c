@@ -136,8 +136,10 @@ void discord_http_send_msg(struct im_connection *ic, char *id, char *msg)
   discord_data *dd = ic->proto_data;
   GString *request = g_string_new("");
   GString *content = g_string_new("");
+  gchar *emsg = g_strescape(msg, NULL);;
 
-  g_string_printf(content, "{\"content\":\"%s\"}", msg);
+  g_string_printf(content, "{\"content\":\"%s\"}", emsg);
+  g_free(emsg);
   g_string_printf(request, "POST /api/channels/%s/messages HTTP/1.1\r\n"
                   "Host: %s\r\n"
                   "User-Agent: Bitlbee-Discord\r\n"
