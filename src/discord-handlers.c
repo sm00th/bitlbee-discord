@@ -301,6 +301,80 @@ static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
   }
 }
 
+static void discord_post_message(struct im_connection *ic, json_value *minfo,
+                                 channel_info *cinfo, gboolean is_edit)
+{
+  gchar *msg = json_o_strdup(minfo, "content");
+
+  if (is_edit == TRUE) {
+    gchar *epx = set_getstr(&ic->acc->set, "edit_prefix");
+    gchar *newmsg = g_strconcat(epx, msg, NULL);
+    g_free(msg);
+    msg = newmsg;
+  }
+
+  if (cinfo->type == CHANNEL_PRIVATE) {
+    if (!g_strcmp0(json_o_str(json_o_get(minfo, "author"), "username"),
+                   cinfo->to.handle.name)) {
+      imcb_buddy_msg(cinfo->to.handle.ic,
+                     cinfo->to.handle.name,
+                     msg, 0, 0);
+    }
+  } else if (cinfo->type == CHANNEL_TEXT) {
+    struct groupchat *gc = cinfo->to.channel.gc;
+    json_value *mentions = json_o_get(minfo, "mentions");
+    if (mentions != NULL && mentions->type == json_array) {
+      for (int midx = 0; midx < mentions->u.array.length; midx++) {
+        json_value *uinfo = mentions->u.array.values[midx];
+        gchar *newmsg = NULL;
+        gchar *idstr = g_strdup_printf("<@%s>", json_o_str(uinfo, "id"));
+        gchar *unstr = g_strdup_printf("@%s",
+                                       json_o_str(uinfo, "username"));
+        GRegex *regex = g_regex_new(idstr, 0, 0, NULL);
+        newmsg = g_regex_replace_literal(regex, msg, -1, 0,
+                                         unstr, 0, NULL);
+        g_free(msg);
+        msg = newmsg;
+        g_regex_unref(regex);
+        g_free(idstr);
+        g_free(unstr);
+      }
+    }
+
+    imcb_chat_msg(gc, json_o_str(json_o_get(minfo, "author"), "username"),
+                  msg, 0, 0);
+  }
+  g_free(msg);
+}
+
+static void discord_handle_message(struct im_connection *ic, json_value *minfo,
+                                   handler_action action)
+{
+  discord_data *dd = ic->proto_data;
+
+  if (minfo == NULL || minfo->type != json_object) {
+    return;
+  }
+
+  channel_info *cinfo = get_channel_by_id(dd, json_o_str(minfo, "channel_id"),
+                                          NULL);
+  if (cinfo == NULL) {
+    return;
+  }
+
+  if (action == ACTION_CREATE) {
+    guint64 msgid = g_ascii_strtoull(json_o_str(minfo, "id"), NULL, 10);
+    if (msgid > cinfo->last_msg) {
+      discord_post_message(ic, minfo, cinfo, FALSE);
+      cinfo->last_msg = msgid;
+    }
+  } else if (action == ACTION_UPDATE) {
+    if (json_o_str(json_o_get(minfo, "author"), "username") != NULL) {
+      discord_post_message(ic, minfo, cinfo, TRUE);
+    }
+  }
+}
+
 void discord_parse_message(struct im_connection *ic)
 {
   discord_data *dd = ic->proto_data;
@@ -406,55 +480,10 @@ void discord_parse_message(struct im_connection *ic)
     discord_handle_server(ic, sinfo, ACTION_DELETE);
   } else if (g_strcmp0(event, "MESSAGE_CREATE") == 0) {
     json_value *minfo = json_o_get(js, "d");
-
-    if (minfo == NULL || minfo->type != json_object) {
-      goto exit;
-    }
-
-    guint64 msgid = g_ascii_strtoull(json_o_str(minfo, "id"), NULL, 10);
-    const char *channel_id = json_o_str(minfo, "channel_id");
-
-    channel_info *cinfo = get_channel_by_id(dd, channel_id, NULL);
-    if (cinfo == NULL) {
-      goto exit;
-    }
-
-    if (msgid > cinfo->last_msg) {
-      if (cinfo->type == CHANNEL_PRIVATE) {
-        if (!g_strcmp0(json_o_str(json_o_get(minfo, "author"), "username"),
-                 cinfo->to.handle.name)) {
-          imcb_buddy_msg(cinfo->to.handle.ic,
-                         cinfo->to.handle.name,
-                         (char *)json_o_str(minfo, "content"), 0, 0);
-        }
-      } else if (cinfo->type == CHANNEL_TEXT) {
-        struct groupchat *gc = cinfo->to.channel.gc;
-        gchar *msg = json_o_strdup(minfo, "content");
-        json_value *mentions = json_o_get(minfo, "mentions");
-        if (mentions != NULL && mentions->type == json_array) {
-          for (int midx = 0; midx < mentions->u.array.length; midx++) {
-            json_value *uinfo = mentions->u.array.values[midx];
-            gchar *newmsg = NULL;
-            gchar *idstr = g_strdup_printf("<@%s>", json_o_str(uinfo, "id"));
-            gchar *unstr = g_strdup_printf("@%s",
-                                           json_o_str(uinfo, "username"));
-            GRegex *regex = g_regex_new(idstr, 0, 0, NULL);
-            newmsg = g_regex_replace_literal(regex, msg, -1, 0,
-                                             unstr, 0, NULL);
-            g_free(msg);
-            msg = newmsg;
-            g_regex_unref(regex);
-            g_free(idstr);
-            g_free(unstr);
-          }
-        }
-
-        imcb_chat_msg(gc, json_o_str(json_o_get(minfo, "author"), "username"),
-                      msg, 0, 0);
-        g_free(msg);
-      }
-      cinfo->last_msg = msgid;
-    }
+    discord_handle_message(ic, minfo, ACTION_CREATE);
+  } else if (g_strcmp0(event, "MESSAGE_UPDATE") == 0) {
+    json_value *minfo = json_o_get(js, "d");
+    discord_handle_message(ic, minfo, ACTION_UPDATE);
   } else {
     g_print("%s: unhandled event: %s\n", __func__, event);
     g_print("%s\n", dd->ws_buf->str);

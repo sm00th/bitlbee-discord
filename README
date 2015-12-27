@@ -55,13 +55,17 @@ Options
 This section describes options available throug "account set" bitlbee command
 (for help on usage of this command see "help account set").
 
-  - host (type: string; default: discordapp.com)
+  - host (type: string; default: "discordapp.com")
     Discord server hostname. Just in case discord changes the hostname or there
     are some alternatives with compatible API.
 
   - voice_status_notify (type: boolean; default: no)
     This enables text notifications in your control channel about users
     changing/leaving voice channels. Can be noisy on big servers.
+
+  - edit_prefix (type: string; default: "EDIT: ")
+    A string that will be prefixed to an edited message to distinguish those
+    from normal ones.
 
 Bugs
 ----
