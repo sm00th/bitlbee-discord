@@ -28,6 +28,7 @@ static void discord_init(account_t *acc)
 
   s = set_add(&acc->set, "voice_status_notify", "off", set_eval_bool, acc);
   s = set_add(&acc->set, "edit_prefix", "EDIT: ", NULL, acc);
+  s = set_add(&acc->set, "urlinfo_handle", "urlinfo", NULL, acc);
 }
 
 static void discord_login(account_t *acc)

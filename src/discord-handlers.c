@@ -301,8 +301,19 @@ static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
   }
 }
 
-static void discord_post_message(struct im_connection *ic, json_value *minfo,
-                                 channel_info *cinfo, gboolean is_edit)
+static void discord_post_message(channel_info *cinfo, const gchar *author,
+                                 gchar *msg)
+{
+  if (cinfo->type == CHANNEL_PRIVATE) {
+    imcb_buddy_msg(cinfo->to.handle.ic, author, msg, 0, 0);
+  } else if (cinfo->type == CHANNEL_TEXT) {
+    imcb_chat_msg(cinfo->to.channel.gc, author, msg, 0, 0);
+  }
+}
+
+static void discord_prepare_message(struct im_connection *ic,
+                                    json_value *minfo,
+                                    channel_info *cinfo, gboolean is_edit)
 {
   gchar *msg = json_o_strdup(minfo, "content");
 
@@ -316,12 +327,10 @@ static void discord_post_message(struct im_connection *ic, json_value *minfo,
   if (cinfo->type == CHANNEL_PRIVATE) {
     if (!g_strcmp0(json_o_str(json_o_get(minfo, "author"), "username"),
                    cinfo->to.handle.name)) {
-      imcb_buddy_msg(cinfo->to.handle.ic,
-                     cinfo->to.handle.name,
-                     msg, 0, 0);
+
+      discord_post_message(cinfo, cinfo->to.handle.name, msg);
     }
   } else if (cinfo->type == CHANNEL_TEXT) {
-    struct groupchat *gc = cinfo->to.channel.gc;
     json_value *mentions = json_o_get(minfo, "mentions");
     if (mentions != NULL && mentions->type == json_array) {
       for (int midx = 0; midx < mentions->u.array.length; midx++) {
@@ -341,8 +350,8 @@ static void discord_post_message(struct im_connection *ic, json_value *minfo,
       }
     }
 
-    imcb_chat_msg(gc, json_o_str(json_o_get(minfo, "author"), "username"),
-                  msg, 0, 0);
+    discord_post_message(cinfo, json_o_str(json_o_get(minfo, "author"),
+                                           "username"), msg);
   }
   g_free(msg);
 }
@@ -365,12 +374,41 @@ static void discord_handle_message(struct im_connection *ic, json_value *minfo,
   if (action == ACTION_CREATE) {
     guint64 msgid = g_ascii_strtoull(json_o_str(minfo, "id"), NULL, 10);
     if (msgid > cinfo->last_msg) {
-      discord_post_message(ic, minfo, cinfo, FALSE);
+      discord_prepare_message(ic, minfo, cinfo, FALSE);
       cinfo->last_msg = msgid;
     }
   } else if (action == ACTION_UPDATE) {
     if (json_o_str(json_o_get(minfo, "author"), "username") != NULL) {
-      discord_post_message(ic, minfo, cinfo, TRUE);
+      discord_prepare_message(ic, minfo, cinfo, TRUE);
+    } else {
+      json_value *embeds = json_o_get(minfo, "embeds");
+      if (embeds != NULL && embeds->type == json_array) {
+        for (int eidx = 0; eidx < embeds->u.array.length; eidx++) {
+          gchar *msg = NULL;
+          const char *author = NULL;
+
+          if (cinfo->type == CHANNEL_PRIVATE) {
+            author = cinfo->to.handle.name;
+          } else if (cinfo->type == CHANNEL_TEXT) {
+            author = set_getstr(&ic->acc->set, "urlinfo_handle");
+          }
+
+          const char *title = json_o_str(embeds->u.array.values[eidx], "title");
+          if (title != NULL) {
+            msg = g_strconcat("title: ", title, NULL);
+            discord_post_message(cinfo, author, msg);
+            g_free(msg);
+          }
+
+          const char *description = json_o_str(embeds->u.array.values[eidx],
+                                               "description");
+          if (description != NULL) {
+            msg = g_strconcat("description: ", description, NULL);
+            discord_post_message(cinfo, author, msg);
+            g_free(msg);
+          }
+        }
+      }
     }
   }
 }

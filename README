@@ -67,6 +67,10 @@ This section describes options available throug "account set" bitlbee command
     A string that will be prefixed to an edited message to distinguish those
     from normal ones.
 
+  - urlinfo_handle (type: string; default: "urlinfo")
+    User handle that will be used to post url expansion info such as title and
+    description in groupchats.
+
 Bugs
 ----
 Plugin is in early development stages, so there should be plenty, please report
