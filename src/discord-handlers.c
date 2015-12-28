@@ -357,8 +357,8 @@ static void discord_prepare_message(struct im_connection *ic,
   g_free(msg);
 }
 
-static void discord_handle_message(struct im_connection *ic, json_value *minfo,
-                                   handler_action action)
+void discord_handle_message(struct im_connection *ic, json_value *minfo,
+                            handler_action action)
 {
   discord_data *dd = ic->proto_data;
 
@@ -481,6 +481,26 @@ void discord_parse_message(struct im_connection *ic)
           ci->to.handle.ic = ic;
 
           dd->pchannels = g_slist_prepend(dd->pchannels, ci);
+        }
+      }
+    }
+
+    if (set_getint(&ic->acc->set, "max_backlog") > 0) {
+      json_value *rs = json_o_get(data, "read_state");
+      if (rs != NULL && rs->type == json_array) {
+        for (int rsidx = 0; rsidx < rs->u.array.length; rsidx++) {
+          if (rs->u.array.values[rsidx]->type == json_object) {
+            json_value *rsinfo = rs->u.array.values[rsidx];
+
+            const char *channel_id = json_o_str(rsinfo, "id");
+            const char *lmsg = json_o_str(rsinfo, "last_message_id");
+            guint64 lm = g_ascii_strtoull(lmsg, NULL, 10);
+            channel_info *cinfo = get_channel_by_id(dd, channel_id, NULL);
+            if (cinfo->last_msg > lm) {
+              cinfo->last_msg = lm;
+              discord_http_get_backlog(ic, channel_id);
+            }
+          }
         }
       }
     }

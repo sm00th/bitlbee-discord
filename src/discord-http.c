@@ -20,6 +20,7 @@
 
 #include "discord.h"
 #include "discord-http.h"
+#include "discord-handlers.h"
 #include "discord-websockets.h"
 
 static void discord_http_get(struct im_connection *ic, const char *api_path,
@@ -134,6 +135,41 @@ static void discord_http_send_msg_cb(struct http_request *req)
   if (req->status_code != 200) {
     imcb_error(ic, "Failed to send message (%d).", req->status_code);
   }
+}
+
+static void discord_http_backlog_cb(struct http_request *req)
+{
+  struct im_connection *ic = req->data;
+  if (req->status_code != 200) {
+    imcb_error(ic, "Failed to get backlog (%d).", req->status_code);
+  } else {
+    json_value *messages = json_parse(req->reply_body, req->body_size);
+    if (!messages || messages->type != json_array) {
+      imcb_error(ic, "Failed to parse json reply for backlog.");
+      imc_logout(ic, TRUE);
+      json_value_free(messages);
+      return;
+    }
+
+    for (int midx = messages->u.array.length - 1; midx >= 0; midx--) {
+      json_value *minfo = messages->u.array.values[midx];
+      discord_handle_message(ic, minfo, ACTION_CREATE);
+    }
+
+    json_value_free(messages);
+  }
+}
+
+void discord_http_get_backlog(struct im_connection *ic, const char *channel_id)
+{
+  GString *api = g_string_new("");
+
+  g_string_printf(api, "channels/%s/messages?limit=%d", channel_id,
+                  set_getint(&ic->acc->set, "max_backlog"));
+
+  discord_http_get(ic, api->str, discord_http_backlog_cb, ic);
+
+  g_string_free(api, TRUE);
 }
 
 void discord_http_send_msg(struct im_connection *ic, const char *id,
