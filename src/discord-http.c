@@ -123,6 +123,11 @@ static void discord_http_login_cb(struct http_request *req)
   }
 }
 
+static void discord_http_noop_cb(struct http_request *req)
+{
+  return;
+}
+
 static void discord_http_send_msg_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
@@ -131,7 +136,8 @@ static void discord_http_send_msg_cb(struct http_request *req)
   }
 }
 
-void discord_http_send_msg(struct im_connection *ic, char *id, char *msg)
+void discord_http_send_msg(struct im_connection *ic, const char *id,
+                           const char *msg)
 {
   discord_data *dd = ic->proto_data;
   GString *request = g_string_new("");
@@ -157,6 +163,28 @@ void discord_http_send_msg(struct im_connection *ic, char *id, char *msg)
                                    request->str, discord_http_send_msg_cb, ic);
 
   g_string_free(content, TRUE);
+  g_string_free(request, TRUE);
+}
+
+void discord_http_send_ack(struct im_connection *ic, const char *channel_id,
+                           const char *message_id)
+{
+  discord_data *dd = ic->proto_data;
+  GString *request = g_string_new("");
+
+  g_string_printf(request, "POST /api/channels/%s/messages/%s/ack HTTP/1.1\r\n"
+                  "Host: %s\r\n"
+                  "User-Agent: Bitlbee-Discord\r\n"
+                  "Authorization: %s\r\n"
+                  "Content-Length: 0\r\n\r\n",
+                  channel_id, message_id,
+                  set_getstr(&ic->acc->set, "host"),
+                  dd->token);
+
+  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 80, 0,
+                                   request->str, discord_http_noop_cb,
+                                   NULL);
+
   g_string_free(request, TRUE);
 }
 

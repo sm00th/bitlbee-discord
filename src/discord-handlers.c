@@ -19,6 +19,7 @@
 
 #include "discord-util.h"
 #include "discord-handlers.h"
+#include "discord-http.h"
 #include "discord-websockets.h"
 
 static void discord_handle_voice_state(struct im_connection *ic,
@@ -375,6 +376,9 @@ static void discord_handle_message(struct im_connection *ic, json_value *minfo,
     guint64 msgid = g_ascii_strtoull(json_o_str(minfo, "id"), NULL, 10);
     if (msgid > cinfo->last_msg) {
       discord_prepare_message(ic, minfo, cinfo, FALSE);
+      if (g_strcmp0(json_o_str(json_o_get(minfo, "author"), "id"), dd->id)) {
+        discord_http_send_ack(ic, cinfo->id, json_o_str(minfo, "id"));
+      }
       cinfo->last_msg = msgid;
     }
   } else if (action == ACTION_UPDATE) {
@@ -482,8 +486,6 @@ void discord_parse_message(struct im_connection *ic)
     }
 
     imcb_connected(ic);
-  } else if (g_strcmp0(event, "TYPING_START") == 0) {
-    // Ignoring those for now
   } else if (g_strcmp0(event, "VOICE_STATE_UPDATE") == 0) {
     json_value *vsinfo = json_o_get(js, "d");
     discord_handle_voice_state(ic, vsinfo, json_o_str(vsinfo, "guild_id"));
@@ -522,6 +524,10 @@ void discord_parse_message(struct im_connection *ic)
   } else if (g_strcmp0(event, "MESSAGE_UPDATE") == 0) {
     json_value *minfo = json_o_get(js, "d");
     discord_handle_message(ic, minfo, ACTION_UPDATE);
+  } else if (g_strcmp0(event, "TYPING_START") == 0) {
+    // Ignoring those for now
+  } else if (g_strcmp0(event, "MESSAGE_ACK") == 0) {
+    // Ignoring those for now
   } else {
     g_print("%s: unhandled event: %s\n", __func__, event);
     g_print("%s\n", dd->ws_buf->str);
