@@ -19,14 +19,14 @@
 #include "discord-websockets.h"
 #include "discord-handlers.h"
 
-static int discord_ws_send_payload(struct libwebsocket *wsi, const char *pload,
+static int discord_ws_send_payload(struct lws *wsi, const char *pload,
                                    size_t psize)
 {
   int ret = 0;
   unsigned char *buf = g_malloc0(LWS_SEND_BUFFER_PRE_PADDING + \
                                  psize + LWS_SEND_BUFFER_POST_PADDING);
   strncpy((char*)&buf[LWS_SEND_BUFFER_PRE_PADDING], pload, psize);
-  ret = libwebsocket_write(wsi, &buf[LWS_SEND_BUFFER_PRE_PADDING], psize,
+  ret = lws_write(wsi, &buf[LWS_SEND_BUFFER_PRE_PADDING], psize,
                            LWS_WRITE_TEXT);
   g_free(buf);
   return ret;
@@ -39,7 +39,7 @@ gboolean discord_ws_keepalive_loop(gpointer data, gint fd,
   discord_data *dd = ic->proto_data;
 
   if (dd->state == WS_READY) {
-    libwebsocket_callback_on_writable(dd->lwsctx, dd->lws);
+    lws_callback_on_writable(dd->lws);
   }
   return TRUE;
 }
@@ -51,7 +51,7 @@ static gboolean discord_ws_service_loop(gpointer data, gint fd,
 
   discord_data *dd = ic->proto_data;
 
-  libwebsocket_service(dd->lwsctx, 0);
+  lws_service(dd->lwsctx, 0);
 
   if (dd->state == WS_CLOSING) {
     imc_logout(ic, TRUE);
@@ -61,18 +61,26 @@ static gboolean discord_ws_service_loop(gpointer data, gint fd,
 }
 
 static int
-discord_ws_callback(struct libwebsocket_context *this,
-                    struct libwebsocket *wsi,
-                    enum libwebsocket_callback_reasons reason,
+discord_ws_callback(struct lws *wsi,
+                    enum lws_callback_reasons reason,
                     void *user, void *in, size_t len)
 {
-  struct im_connection *ic = libwebsocket_context_user(this);
+  struct im_connection *ic = NULL;
+  discord_data *dd = NULL;
 
-  discord_data *dd = ic->proto_data;
+  if (wsi == NULL) {
+    return 0;
+  }
+  const struct lws_protocols *proto = lws_get_protocol(wsi);
+  if (proto != NULL) {
+    ic = lws_get_protocol(wsi)->user;
+    dd = ic->proto_data;
+  }
+
   switch(reason) {
     case LWS_CALLBACK_CLIENT_ESTABLISHED:
       dd->state = WS_CONNECTED;
-      libwebsocket_callback_on_writable(this, wsi);
+      lws_callback_on_writable(wsi);
       break;
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
       imcb_error(ic, "Websocket connection error");
@@ -100,7 +108,7 @@ discord_ws_callback(struct libwebsocket_context *this,
       break;
     case LWS_CALLBACK_CLIENT_RECEIVE:
       {
-        size_t rpload = libwebsockets_remaining_packet_payload(wsi);
+        size_t rpload = lws_remaining_packet_payload(wsi);
         if (dd->ws_buf == NULL) {
           dd->ws_buf = g_string_new("");
         }
@@ -115,7 +123,7 @@ discord_ws_callback(struct libwebsocket_context *this,
     case LWS_CALLBACK_CLOSED:
       b_event_remove(dd->keepalive_loop_id);
       dd->state = WS_CLOSING;
-      libwebsocket_cancel_service(dd->lwsctx);
+      lws_cancel_service(dd->lwsctx);
       break;
     case LWS_CALLBACK_ADD_POLL_FD:
       {
@@ -163,10 +171,10 @@ discord_ws_callback(struct libwebsocket_context *this,
   return 0;
 }
 
-static struct libwebsocket_protocols protocols[] =
+static struct lws_protocols protocols[] =
 {
-  { "http-only,chat", discord_ws_callback, 0, 0 },
-  { NULL, NULL, 0, 0 } /* end */
+  { "http-only,chat", discord_ws_callback, 0, 0, 0, NULL },
+  { NULL, NULL, 0, 0, 0, NULL } /* end */
 };
 
 int discord_ws_init(struct im_connection *ic, discord_data *dd)
@@ -176,9 +184,10 @@ int discord_ws_init(struct im_connection *ic, discord_data *dd)
   memset(&info, 0, sizeof(info));
 
   info.port = CONTEXT_PORT_NO_LISTEN;
+  protocols[0].user = ic;
   info.protocols = protocols;
 #ifndef LWS_NO_EXTENSIONS
-  info.extensions = libwebsocket_get_internal_extensions();
+  info.extensions = lws_get_internal_extensions();
 #else
   info.extensions = NULL;
 #endif
@@ -188,12 +197,12 @@ int discord_ws_init(struct im_connection *ic, discord_data *dd)
 
   lws_set_log_level(0, NULL);
 
-  dd->lwsctx = libwebsocket_create_context(&info);
+  dd->lwsctx = lws_create_context(&info);
   if (dd->lwsctx == NULL) {
     return -1;
   }
 
-  dd->lws = libwebsocket_client_connect(dd->lwsctx, dd->gateway,
+  dd->lws = lws_client_connect(dd->lwsctx, dd->gateway,
                                         443, 1, "/", dd->gateway,
                                         "discordapp.com",
                                         protocols[0].name, -1);
@@ -203,6 +212,6 @@ int discord_ws_init(struct im_connection *ic, discord_data *dd)
 void discord_ws_cleanup(discord_data *dd)
 {
   if (dd->lwsctx != NULL) {
-    libwebsocket_context_destroy(dd->lwsctx);
+    lws_context_destroy(dd->lwsctx);
   }
 }

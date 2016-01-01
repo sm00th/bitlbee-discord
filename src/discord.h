@@ -41,8 +41,8 @@ typedef struct _discord_data {
   char     *id;
   char     *uname;
   char     *gateway;
-  struct libwebsocket_context *lwsctx;
-  struct libwebsocket *lws;
+  struct lws_context *lwsctx;
+  struct lws *lws;
   GSList   *servers;
   GSList   *pchannels;
   gint     main_loop_id;
