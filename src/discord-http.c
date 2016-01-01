@@ -167,15 +167,34 @@ void discord_http_get_backlog(struct im_connection *ic, const char *channel_id)
   g_string_free(api, TRUE);
 }
 
+static gboolean discord_escape_string(const GMatchInfo *match,
+                                      GString *result,
+                                      gpointer user_data)
+{
+  guint32 *matches = user_data;
+  gint pos = 0;
+
+  if (g_match_info_fetch_pos(match, 0, &pos, NULL)) {
+    gchar *r = g_strdup_printf("\\%s", g_match_info_fetch(match, 0));
+    result = g_string_insert(result, pos + (*matches)++, r);
+    g_free(r);
+  }
+  return FALSE;
+}
+
 void discord_http_send_msg(struct im_connection *ic, const char *id,
                            const char *msg)
 {
   discord_data *dd = ic->proto_data;
   GString *request = g_string_new("");
   GString *content = g_string_new("");
-  gchar *emsg = g_strescape(msg, NULL);;
+  guint32 matches = 0;
+  GRegex *regex = g_regex_new("[\"]", 0, 0, NULL);
+  gchar *emsg = g_regex_replace_eval(regex, msg, -1, 0, 0,
+                                     discord_escape_string, &matches, NULL);
 
   g_string_printf(content, "{\"content\":\"%s\"}", emsg);
+  g_regex_unref(regex);
   g_free(emsg);
   g_string_printf(request, "POST /api/channels/%s/messages HTTP/1.1\r\n"
                   "Host: %s\r\n"
