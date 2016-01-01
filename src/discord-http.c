@@ -219,7 +219,7 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
 void discord_http_send_ack(struct im_connection *ic, const char *channel_id,
                            const char *message_id)
 {
-  if (set_getbool(&ic->acc->set, "disable_acks") == TRUE) {
+  if (set_getbool(&ic->acc->set, "send_acks") == FALSE) {
     return;
   }
 

@@ -27,7 +27,7 @@ static void discord_init(account_t *acc)
   s->flags |= ACC_SET_OFFLINE_ONLY;
 
   s = set_add(&acc->set, "voice_status_notify", "off", set_eval_bool, acc);
-  s = set_add(&acc->set, "disable_acks", "off", set_eval_bool, acc);
+  s = set_add(&acc->set, "send_acks", "on", set_eval_bool, acc);
   s = set_add(&acc->set, "edit_prefix", "EDIT: ", NULL, acc);
   s = set_add(&acc->set, "urlinfo_handle", "urlinfo", NULL, acc);
 
