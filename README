@@ -75,6 +75,11 @@ This section describes options available throug "account set" bitlbee command
     Maximum number of backlog messages per channel to fetch on connection.
     Unlike twitter implementation in bitlbee this won't dump seen messages.
 
+  - disable_acks (type: boolean; default: no)
+    By default bitlbee-discord will send an "ack" for every message received,
+    thus marking everything as "read" on mobile/webapp. Setting this to true
+    will disable all acks from bitlbee-discord.
+
 Bugs
 ----
 Plugin is in early development stages, so there should be plenty, please report
