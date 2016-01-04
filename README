@@ -19,29 +19,40 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 Build dependencies
 ------------------
-- bitlbee and headers
+- bitlbee and headers >= 3.4
   If using distribution version of bitlbee you will need to install the dev
   package, usually bitlbee-dev or bitlbee-devel. If bitlbee was built from
   source don't forget to do `make install-dev`.
 
-- libwebsockets >= 1.5 and headers (https://libwebsockets.org)
+- libwebsockets >= 1.6 and headers (https://libwebsockets.org)
   Archlinux users can use libwebsocket-git from AUR, others are out of luck and
   will have to build it from source for now, debian's version in sid is too old
   (1.2), fedora23 doesn't provide this package at all.
 
-- glib2 and headers
+- glib2 and headers => 2.32
   The library itself is usually installed as a dependency of bitlbee, headers
   need to be installed separately. In debian the package containing them is
   libglib2.0-dev.
 
+- autotools (if building from git)
+  A bit of an overkill, but autotools is a buildsystem of choice now, sorry.
+
+
 Building and Installing
 -----------------------
-The process is extremely dumb for now, so it is just:
+If building from git you will first need to generate autotools configuration
+script and related files by executing the following command:
 
-  $ make && sudo make install
+  $ ./autogen.sh
 
-This will build the discord.so file and put it into /usr/lib/bitlbee directory,
-if your bitlbee's plugindir is somewhere else you'll have to move it manually.
+After that (or when building from a tarball) you can build as usual:
+
+  $ ./configure
+  $ make
+  $ sudo make install
+
+If your bitlbee's plugindir is in non-standard location you can specify it by
+calling ./configure with --with-plugindir=/path/to/plugindir option.
 
 Usage
 -----
