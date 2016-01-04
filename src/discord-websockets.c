@@ -71,9 +71,10 @@ discord_ws_callback(struct lws *wsi,
   if (wsi == NULL) {
     return 0;
   }
-  const struct lws_protocols *proto = lws_get_protocol(wsi);
-  if (proto != NULL) {
-    ic = lws_get_protocol(wsi)->user;
+
+  struct lws_context *wsctx = lws_get_context(wsi);
+  if (wsctx != NULL) {
+    ic = lws_context_user(wsctx);
     dd = ic->proto_data;
   }
 
@@ -184,7 +185,6 @@ int discord_ws_init(struct im_connection *ic, discord_data *dd)
   memset(&info, 0, sizeof(info));
 
   info.port = CONTEXT_PORT_NO_LISTEN;
-  protocols[0].user = ic;
   info.protocols = protocols;
 #ifndef LWS_NO_EXTENSIONS
   info.extensions = lws_get_internal_extensions();
