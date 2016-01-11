@@ -30,6 +30,7 @@ static void discord_init(account_t *acc)
   s = set_add(&acc->set, "send_acks", "on", set_eval_bool, acc);
   s = set_add(&acc->set, "edit_prefix", "EDIT: ", NULL, acc);
   s = set_add(&acc->set, "urlinfo_handle", "urlinfo", NULL, acc);
+  s = set_add(&acc->set, "mention_suffix", ":", NULL, acc);
 
   s = set_add(&acc->set, "max_backlog", "50", set_eval_int, acc);
   s->flags |= ACC_SET_OFFLINE_ONLY;

@@ -32,8 +32,8 @@ static void discord_handle_voice_state(struct im_connection *ic,
     return;
   }
 
-  user_info *uinfo = get_user_by_id(dd, json_o_str(vsinfo, "user_id"),
-                                    server_id);
+  user_info *uinfo = get_user(dd, json_o_str(vsinfo, "user_id"), server_id,
+                              SEARCH_ID);
 
   if (uinfo == NULL || g_strcmp0(uinfo->id, dd->id) == 0) {
     return;
@@ -72,8 +72,8 @@ static void discord_handle_presence(struct im_connection *ic,
     return;
   }
 
-  user_info *uinfo = get_user_by_id(dd, json_o_str(json_o_get(pinfo, "user"),
-                                    "id"), server_id);
+  user_info *uinfo = get_user(dd, json_o_str(json_o_get(pinfo, "user"), "id"),
+                              server_id, SEARCH_ID);
 
   if (uinfo == NULL) {
     return;
@@ -223,7 +223,7 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
       sinfo->users = g_slist_prepend(sinfo->users, ui);
     }
   } else if (action == ACTION_DELETE) {
-    user_info *udata = get_user_by_id(dd, id, server_id);
+    user_info *udata = get_user(dd, id, server_id, SEARCH_ID);
 
     if (udata == NULL) {
       return;

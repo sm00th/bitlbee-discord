@@ -16,10 +16,16 @@
  */
 #include "discord.h"
 
+typedef enum {
+  SEARCH_UNKNOWN,
+  SEARCH_ID,
+  SEARCH_NAME
+} search_t;
+
 channel_info *get_channel_by_id(discord_data *dd, const char *channel_id,
                                 const char *server_id);
-user_info *get_user_by_id(discord_data *dd, const char *user_id,
-                          const char *server_id);
+user_info *get_user(discord_data *dd, const char *uname,
+                    const char *server_id, search_t type);
 server_info *get_server_by_id(discord_data *dd, const char *server_id);
 
 void free_channel_info(channel_info *cinfo);

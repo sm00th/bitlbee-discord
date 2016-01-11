@@ -22,6 +22,7 @@
 #include "discord-http.h"
 #include "discord-handlers.h"
 #include "discord-websockets.h"
+#include "discord-util.h"
 
 static void discord_http_get(struct im_connection *ic, const char *api_path,
                              http_input_function cb_func, gpointer data)
@@ -182,6 +183,29 @@ static gboolean discord_escape_string(const GMatchInfo *match,
   return FALSE;
 }
 
+static gboolean discord_mentions_string(const GMatchInfo *match,
+                                        GString *result,
+                                        gpointer user_data)
+{
+  discord_data *dd = (discord_data *)user_data;
+  gchar *name = g_match_info_fetch(match, 1);
+
+  user_info *uinfo = get_user(dd, name, NULL, SEARCH_NAME);
+  g_free(name);
+
+  if (uinfo != NULL) {
+    gchar *id = g_strdup_printf("<@%s>", uinfo->id);
+    result = g_string_append(result, id);
+    g_free(id);
+  } else {
+    gchar *fmatch = g_match_info_fetch(match, 0);
+    result = g_string_append(result, fmatch);
+    g_free(fmatch);
+  }
+
+  return FALSE;
+}
+
 void discord_http_send_msg(struct im_connection *ic, const char *id,
                            const char *msg)
 {
@@ -189,12 +213,27 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
   GString *request = g_string_new("");
   GString *content = g_string_new("");
   guint32 matches = 0;
-  GRegex *regex = g_regex_new("[\"]", 0, 0, NULL);
-  gchar *emsg = g_regex_replace_eval(regex, msg, -1, 0, 0,
+  GRegex *escregex = g_regex_new("[\"]", 0, 0, NULL);
+
+  gchar *emsg = g_regex_replace_eval(escregex, msg, -1, 0, 0,
                                      discord_escape_string, &matches, NULL);
 
+  if (strlen(set_getstr(&ic->acc->set,"mention_suffix")) > 0) {
+    gchar *nmsg = NULL;
+    gchar *hlrstr = g_strdup_printf("(\\S+)%s", set_getstr(&ic->acc->set,
+                                    "mention_suffix"));
+    GRegex *hlregex = g_regex_new(hlrstr, 0, 0, NULL);
+
+    g_free(hlrstr);
+    nmsg = g_regex_replace_eval(hlregex, emsg, -1, 0, 0,
+                                discord_mentions_string, dd, NULL);
+    g_free(emsg);
+    emsg = nmsg;
+    g_regex_unref(hlregex);
+  }
+
   g_string_printf(content, "{\"content\":\"%s\"}", emsg);
-  g_regex_unref(regex);
+  g_regex_unref(escregex);
   g_free(emsg);
   g_string_printf(request, "POST /api/channels/%s/messages HTTP/1.1\r\n"
                   "Host: %s\r\n"

@@ -71,6 +71,11 @@ static gint cmp_user_id(const user_info *uinfo, const char *user_id)
   return g_strcmp0(uinfo->id, user_id);
 }
 
+static gint cmp_user_name(const user_info *uinfo, const char *uname)
+{
+  return g_strcmp0(uinfo->name, uname);
+}
+
 static gint cmp_server_id(const server_info *sinfo, const char *server_id)
 {
   return g_strcmp0(sinfo->id, server_id);
@@ -110,15 +115,34 @@ channel_info *get_channel_by_id(discord_data *dd, const char *channel_id,
   return cl == NULL ?  NULL : cl->data;
 }
 
-user_info *get_user_by_id(discord_data *dd, const char *user_id,
-                          const char *server_id)
+user_info *get_user(discord_data *dd, const char *uname,
+                    const char *server_id, search_t type)
 {
   GSList *ul = NULL;
+  GCompareFunc sfunc = NULL;
+
+  switch(type) {
+    case SEARCH_ID:
+      sfunc = (GCompareFunc)cmp_user_id;
+      break;
+    case SEARCH_NAME:
+      sfunc = (GCompareFunc)cmp_user_name;
+      break;
+    default:
+      return NULL;
+  }
 
   if (server_id != NULL) {
     server_info *sinfo = get_server_by_id(dd, server_id);
-    ul = g_slist_find_custom(sinfo->users, user_id,
-                             (GCompareFunc)cmp_user_id);
+    ul = g_slist_find_custom(sinfo->users, uname, sfunc);
+  } else {
+    for (GSList *sl = dd->servers; sl; sl = g_slist_next(sl)) {
+      server_info *sinfo = sl->data;
+      ul = g_slist_find_custom(sinfo->users, uname, sfunc);
+      if (ul != NULL) {
+        break;
+      }
+    }
   }
 
   return ul == NULL ?  NULL : ul->data;

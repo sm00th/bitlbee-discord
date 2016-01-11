@@ -91,6 +91,17 @@ This section describes options available throug "account set" bitlbee command
     thus marking everything as "read" on mobile/webapp. Setting this to false
     will disable all acks from bitlbee-discord.
 
+  - mention_suffix (type: string; default: ":")
+    Suffinx used in a regex to look for username mentions to automatically
+    convert your usual irc-style "nick:" mentions to discord's "<@id>" format.
+    So if you type "nick: hello" in bitlbee, it will be displayed as
+    "@nick hello" in discord. This can be multicharacter and you can even do OR
+    logic here because it is actually used as a part of glib regex. That is
+    setting this to "[:,]" will match both "nick:" and "nick,". But beware
+    overcomplicating this may lead to bitlbee-discord spending a lot of time
+    parsing your outgoing messages. Setting this to "" will disable this
+    function.
+
 Bugs
 ----
 Plugin is in early development stages, so there should be plenty, please report
