@@ -207,7 +207,7 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
   }
 
   const char *id   = json_o_str(uinfo, "id");
-  const char *name = json_o_str(uinfo, "username");
+  char *name = discord_canonize_name(json_o_str(uinfo, "username"));
 
   if (action == ACTION_CREATE) {
     if (name && !bee_user_by_handle(ic->bee, ic, name)) {
@@ -232,6 +232,8 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
     sinfo->users = g_slist_remove(sinfo->users, udata);
     free_user_info(udata);
   }
+
+  g_free(name);
   // XXX: Should warn about unhandled action _UPDATE if we switch to some
   // centralized handling solution.
 }
@@ -324,10 +326,10 @@ static void discord_prepare_message(struct im_connection *ic,
     msg = newmsg;
   }
 
+  gchar *author = discord_canonize_name(json_o_str(json_o_get(minfo,
+                                        "author"), "username"));
   if (cinfo->type == CHANNEL_PRIVATE) {
-    if (!g_strcmp0(json_o_str(json_o_get(minfo, "author"), "username"),
-                   cinfo->to.handle.name)) {
-
+    if (g_strcmp0(author, cinfo->to.handle.name) == 0) {
       discord_post_message(cinfo, cinfo->to.handle.name, msg);
     }
   } else if (cinfo->type == CHANNEL_TEXT) {
@@ -335,10 +337,10 @@ static void discord_prepare_message(struct im_connection *ic,
     if (mentions != NULL && mentions->type == json_array) {
       for (int midx = 0; midx < mentions->u.array.length; midx++) {
         json_value *uinfo = mentions->u.array.values[midx];
+        gchar *uname = discord_canonize_name(json_o_str(uinfo, "username"));
         gchar *newmsg = NULL;
         gchar *idstr = g_strdup_printf("<@%s>", json_o_str(uinfo, "id"));
-        gchar *unstr = g_strdup_printf("@%s",
-                                       json_o_str(uinfo, "username"));
+        gchar *unstr = g_strdup_printf("@%s", uname);
         GRegex *regex = g_regex_new(idstr, 0, 0, NULL);
         newmsg = g_regex_replace_literal(regex, msg, -1, 0,
                                          unstr, 0, NULL);
@@ -347,12 +349,13 @@ static void discord_prepare_message(struct im_connection *ic,
         g_regex_unref(regex);
         g_free(idstr);
         g_free(unstr);
+        g_free(uname);
       }
     }
 
-    discord_post_message(cinfo, json_o_str(json_o_get(minfo, "author"),
-                                           "username"), msg);
+    discord_post_message(cinfo, author, msg);
   }
+  g_free(author);
   g_free(msg);
 }
 
@@ -448,7 +451,7 @@ void discord_parse_message(struct im_connection *ic)
     json_value *user = json_o_get(data, "user");
     if (user != NULL && user->type == json_object) {
       dd->id = json_o_strdup(user, "id");
-      dd->uname = json_o_strdup(user, "username");
+      dd->uname = discord_canonize_name(json_o_str(user, "username"));
     }
 
     json_value *guilds = json_o_get(data, "guilds");
@@ -474,8 +477,8 @@ void discord_parse_message(struct im_connection *ic)
           if (lmsg != NULL) {
             ci->last_msg = g_ascii_strtoull(lmsg, NULL, 10);
           }
-          ci->to.handle.name = json_o_strdup(json_o_get(pcinfo, "recipient"),
-                                             "username");
+          ci->to.handle.name = discord_canonize_name(json_o_str(
+                                json_o_get(pcinfo, "recipient"), "username"));
           ci->id = json_o_strdup(pcinfo, "id");
           ci->to.handle.ic = ic;
 

@@ -157,3 +157,12 @@ user_info *get_user(discord_data *dd, const char *uname,
 
   return ul == NULL ?  NULL : ul->data;
 }
+
+char *discord_canonize_name(const char *name)
+{
+  GRegex *regex = g_regex_new("[@+ ]", 0, 0, NULL);
+  char *cname = g_regex_replace_literal(regex, name, -1, 0, "_", 0, NULL);
+
+  g_regex_unref(regex);
+  return cname;
+}

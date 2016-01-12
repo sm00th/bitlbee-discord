@@ -33,3 +33,4 @@ void free_discord_data(discord_data *dd);
 void free_server_info(server_info *sinfo);
 void free_user_info(user_info *uinfo);
 void free_gw_data(gw_data *gw);
+char *discord_canonize_name(const char *name);
