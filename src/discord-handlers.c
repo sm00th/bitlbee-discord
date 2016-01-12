@@ -133,7 +133,7 @@ static void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
       title = g_strdup_printf("%s/%s", sinfo->name, name);
       struct groupchat *gc = imcb_chat_new(ic, title);
       imcb_chat_name_hint(gc, name);
-      if (topic != NULL) {
+      if (topic != NULL && strlen(topic) > 0) {
         imcb_chat_topic(gc, "root", (char*)topic, 0);
       }
       g_free(title);
