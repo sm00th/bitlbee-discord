@@ -34,6 +34,14 @@ AC_PROG_LIBTOOL
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 m4_ifdef([AC_PROG_CC_C99], [AC_PROG_CC_C99])
 
+# Define PKG_CHECK_VAR() for pkg-config < 0.28
+m4_define_default(
+    [PKG_CHECK_VAR],
+    [AC_ARG_VAR([$1], [value of $3 for $2, overriding pkg-config])
+     AS_IF([test -z "$$1"], [$1=`$PKG_CONFIG --variable="$3" "$2"`])
+     AS_IF([test -n "$$1"], [$4], [$5])]
+)
+
 # Checks for libraries.
 PKG_CHECK_MODULES([BITLBEE], [bitlbee >= 3.4])
 PKG_CHECK_MODULES([LIBWEBSOCKETS], [libwebsockets >= 1.6])
