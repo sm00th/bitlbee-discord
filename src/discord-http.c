@@ -58,12 +58,32 @@ static void discord_http_gateway_cb(struct http_request *req)
     discord_data *dd = ic->proto_data;
 
     const char *gw = json_o_str(js, "url");
-    char *tmp;
-    if ((tmp = g_strstr_len(gw, MIN(strlen(gw), 6), "://"))) {
-      dd->gateway = g_strdup(tmp + 3);
-    } else {
-      dd->gateway = g_strdup(gw);
+    GMatchInfo *match = NULL;
+    GRegex *gwregex = g_regex_new("^(wss?://)?([^/]+)(/.*)?$", 0, 0, NULL);
+
+    g_regex_match(gwregex, gw, 0, &match);
+
+    if (match == NULL) {
+      imcb_error(ic, "Failed to get gateway (%s).", gw);
+      json_value_free(js);
+      g_regex_unref(gwregex);
+      imc_logout(ic, TRUE);
     }
+
+    dd->gateway = g_new0(gw_data, 1);
+
+    gchar *wss = g_match_info_fetch(match, 1);
+    if (g_strcmp0(wss, "wss://") == 0) {
+      dd->gateway->wss = 1;
+    } else {
+      dd->gateway->wss = 0;
+    }
+    g_free(wss);
+
+    dd->gateway->addr = g_match_info_fetch(match, 2);
+    dd->gateway->path = g_match_info_fetch(match, 3);
+
+    g_regex_unref(gwregex);
 
     if (discord_ws_init(ic, dd) < 0) {
       imcb_error(ic, "Failed to create websockets context.");

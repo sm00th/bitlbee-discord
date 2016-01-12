@@ -48,12 +48,22 @@ void free_server_info(server_info *sinfo)
   g_free(sinfo);
 }
 
+void free_gw_data(gw_data *gw)
+{
+  if (gw != NULL) {
+    g_free(gw->addr);
+    g_free(gw->path);
+
+    g_free(gw);
+  }
+}
+
 void free_discord_data(discord_data *dd)
 {
   g_slist_free_full(dd->pchannels, (GDestroyNotify)free_channel_info);
   g_slist_free_full(dd->servers, (GDestroyNotify)free_server_info);
 
-  g_free(dd->gateway);
+  free_gw_data(dd->gateway);
   g_free(dd->token);
   g_free(dd->uname);
   g_free(dd->id);

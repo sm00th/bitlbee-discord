@@ -36,11 +36,17 @@ typedef enum {
   CHANNEL_PRIVATE
 } channel_type;
 
+typedef struct _gw_data {
+  int wss;
+  gchar *addr;
+  gchar *path;
+} gw_data;
+
 typedef struct _discord_data {
   char     *token;
   char     *id;
   char     *uname;
-  char     *gateway;
+  gw_data  *gateway;
   struct lws_context *lwsctx;
   struct lws *lws;
   GSList   *servers;
