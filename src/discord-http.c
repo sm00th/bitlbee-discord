@@ -208,7 +208,12 @@ static gboolean discord_mentions_string(const GMatchInfo *match,
                                         gpointer user_data)
 {
   discord_data *dd = (discord_data *)user_data;
-  gchar *name = g_match_info_fetch(match, 1);
+  gchar *name = g_match_info_fetch(match, 3);
+
+  if (name == NULL || strlen(name) == 0) {
+    g_free(name);
+    name = g_match_info_fetch(match, 2);
+  }
 
   user_info *uinfo = get_user(dd, name, NULL, SEARCH_NAME);
   g_free(name);
@@ -218,7 +223,7 @@ static gboolean discord_mentions_string(const GMatchInfo *match,
     result = g_string_append(result, id);
     g_free(id);
   } else {
-    gchar *fmatch = g_match_info_fetch(match, 0);
+    gchar *fmatch = g_match_info_fetch(match, 1);
     result = g_string_append(result, fmatch);
     g_free(fmatch);
   }
@@ -240,8 +245,9 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
 
   if (strlen(set_getstr(&ic->acc->set,"mention_suffix")) > 0) {
     gchar *nmsg = NULL;
-    gchar *hlrstr = g_strdup_printf("(\\S+)%s", set_getstr(&ic->acc->set,
-                                    "mention_suffix"));
+    gchar *hlrstr = g_strdup_printf("(@(\\S+)|(\\S+)%s)",
+                                    set_getstr(&ic->acc->set,
+                                               "mention_suffix"));
     GRegex *hlregex = g_regex_new(hlrstr, 0, 0, NULL);
 
     g_free(hlrstr);
