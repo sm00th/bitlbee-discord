@@ -116,18 +116,36 @@ static void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
   discord_data *dd = ic->proto_data;
   server_info *sinfo = get_server_by_id(dd, server_id);
 
-  if (sinfo == NULL) {
-    return;
-  }
-
   const char *id    = json_o_str(cinfo, "id");
   const char *name  = json_o_str(cinfo, "name");
   const char *type  = json_o_str(cinfo, "type");
   const char *lmid  = json_o_str(cinfo, "last_message_id");
   const char *topic = json_o_str(cinfo, "topic");
+  gboolean is_private = FALSE;
+
+  json_value *pvt = json_o_get(cinfo, "is_private");
+  if (pvt != NULL && pvt->type == json_boolean) {
+    is_private = pvt->u.boolean;
+  }
+
+  if (is_private == FALSE && sinfo == NULL) {
+    return;
+  }
 
   if (action == ACTION_CREATE) {
-    if (g_strcmp0(type, "text") == 0) {
+    if (is_private == TRUE) {
+      channel_info *ci = g_new0(channel_info, 1);
+      ci->type = CHANNEL_PRIVATE;
+      if (lmid != NULL) {
+        ci->last_msg = g_ascii_strtoull(lmid, NULL, 10);
+      }
+      ci->to.handle.name = discord_canonize_name(json_o_str(
+                            json_o_get(cinfo, "recipient"), "username"));
+      ci->id = json_o_strdup(cinfo, "id");
+      ci->to.handle.ic = ic;
+
+      dd->pchannels = g_slist_prepend(dd->pchannels, ci);
+    } else if (g_strcmp0(type, "text") == 0) {
       char *title;
 
       title = g_strdup_printf("%s/%s", sinfo->name, name);
@@ -147,27 +165,27 @@ static void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
 
       imcb_chat_add_buddy(gc, dd->uname);
 
-      channel_info *cinfo = g_new0(channel_info, 1);
-      cinfo->type = CHANNEL_TEXT;
-      cinfo->to.channel.gc = gc;
-      cinfo->to.channel.sinfo = sinfo;
-      cinfo->id = g_strdup(id);
+      channel_info *ci = g_new0(channel_info, 1);
+      ci->type = CHANNEL_TEXT;
+      ci->to.channel.gc = gc;
+      ci->to.channel.sinfo = sinfo;
+      ci->id = g_strdup(id);
       if (lmid != NULL) {
-        cinfo->last_msg = g_ascii_strtoull(lmid, NULL, 10);
+        ci->last_msg = g_ascii_strtoull(lmid, NULL, 10);
       }
 
-      gc->data = cinfo;
+      gc->data = ci;
 
-      sinfo->channels = g_slist_prepend(sinfo->channels, cinfo);
+      sinfo->channels = g_slist_prepend(sinfo->channels, ci);
     } else if (g_strcmp0(type, "voice") == 0) {
-      channel_info *cinfo = g_new0(channel_info, 1);
-      cinfo->type = CHANNEL_VOICE;
-      cinfo->last_msg = 0;
-      cinfo->to.handle.name = g_strdup(name);
-      cinfo->id = g_strdup(id);
-      cinfo->to.handle.ic = ic;
+      channel_info *ci = g_new0(channel_info, 1);
+      ci->type = CHANNEL_VOICE;
+      ci->last_msg = 0;
+      ci->to.handle.name = g_strdup(name);
+      ci->id = g_strdup(id);
+      ci->to.handle.ic = ic;
 
-      sinfo->channels = g_slist_prepend(sinfo->channels, cinfo);
+      sinfo->channels = g_slist_prepend(sinfo->channels, ci);
     }
   } else {
     channel_info *cdata = get_channel_by_id(dd, id, server_id);
@@ -469,20 +487,7 @@ void discord_parse_message(struct im_connection *ic)
       for (int pcidx = 0; pcidx < pcs->u.array.length; pcidx++) {
         if (pcs->u.array.values[pcidx]->type == json_object) {
           json_value *pcinfo = pcs->u.array.values[pcidx];
-
-          char *lmsg = (char *)json_o_str(pcinfo, "last_message_id");
-
-          channel_info *ci = g_new0(channel_info, 1);
-          ci->type = CHANNEL_PRIVATE;
-          if (lmsg != NULL) {
-            ci->last_msg = g_ascii_strtoull(lmsg, NULL, 10);
-          }
-          ci->to.handle.name = discord_canonize_name(json_o_str(
-                                json_o_get(pcinfo, "recipient"), "username"));
-          ci->id = json_o_strdup(pcinfo, "id");
-          ci->to.handle.ic = ic;
-
-          dd->pchannels = g_slist_prepend(dd->pchannels, ci);
+          discord_handle_channel(ic, pcinfo, NULL, ACTION_CREATE);
         }
       }
     }
@@ -496,7 +501,10 @@ void discord_parse_message(struct im_connection *ic)
 
             const char *channel_id = json_o_str(rsinfo, "id");
             const char *lmsg = json_o_str(rsinfo, "last_message_id");
-            guint64 lm = g_ascii_strtoull(lmsg, NULL, 10);
+            guint64 lm = 0;
+            if (lmsg != NULL) {
+              lm = g_ascii_strtoull(lmsg, NULL, 10);
+            }
             channel_info *cinfo = get_channel_by_id(dd, channel_id, NULL);
             if (cinfo != NULL && cinfo->last_msg > lm) {
               char *rlmsg = g_strdup_printf("%lu", cinfo->last_msg);
