@@ -24,6 +24,11 @@
 #include "discord-websockets.h"
 #include "discord-util.h"
 
+typedef struct _casm_data {
+  struct im_connection *ic;
+  char *msg;
+} casm_data;
+
 static void discord_http_get(struct im_connection *ic, const char *api_path,
                              http_input_function cb_func, gpointer data)
 {
@@ -335,5 +340,71 @@ void discord_http_login(account_t *acc)
                                    acc->ic);
 
   g_string_free(jlogin, TRUE);
+  g_string_free(request, TRUE);
+}
+
+static void discord_http_casm_cb(struct http_request *req)
+{
+  casm_data *cd = req->data;
+  struct im_connection *ic = cd->ic;
+  if (req->status_code != 200) {
+    imcb_error(ic, "Failed to create private channel (%d).",
+               req->status_code);
+    goto out;
+  }
+
+  json_value *channel = json_parse(req->reply_body, req->body_size);
+  if (!channel || channel->type != json_object) {
+    imcb_error(ic, "Failed to create private channel.");
+    goto jout;
+  }
+
+  discord_handle_channel(ic, channel, NULL, ACTION_CREATE);
+  discord_http_send_msg(ic, json_o_str(channel, "id"), cd->msg);
+
+jout:
+  json_value_free(channel);
+
+out:
+  g_free(cd->msg);
+  g_free(cd);
+}
+
+void discord_http_create_and_send_msg(struct im_connection *ic,
+                                      const char *handle, const char *msg)
+{
+  discord_data *dd = ic->proto_data;
+  user_info *uinfo = get_user(dd, handle, NULL, SEARCH_NAME);
+
+  if (uinfo == NULL) {
+    imcb_error(ic, "Failed to create channel for unknown user: '%s'.",
+               handle);
+    return;
+  }
+
+  GString *request = g_string_new("");
+  GString *content = g_string_new("");
+
+  g_string_printf(content, "{\"recipient_id\":\"%s\"}", uinfo->id);
+  g_string_printf(request, "POST /api/users/%s/channels HTTP/1.1\r\n"
+                  "Host: %s\r\n"
+                  "User-Agent: Bitlbee-Discord\r\n"
+                  "authorization: %s\r\n"
+                  "Content-Type: application/json\r\n"
+                  "Content-Length: %zd\r\n\r\n"
+                  "%s",
+                  dd->id,
+                  set_getstr(&ic->acc->set, "host"),
+                  dd->token,
+                  content->len,
+                  content->str);
+
+  casm_data *cd = g_new0(casm_data, 1);
+  cd->ic = ic;
+  cd->msg = g_strdup(msg);
+  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 80, 0,
+                                   request->str, discord_http_casm_cb, cd);
+
+  g_string_free(content, TRUE);
   g_string_free(request, TRUE);
 }

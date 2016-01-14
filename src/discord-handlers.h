@@ -25,4 +25,6 @@ typedef enum {
 
 void discord_handle_message(struct im_connection *ic, json_value *minfo,
                             handler_action action);
+void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
+                            const char *server_id, handler_action action);
 void discord_parse_message(struct im_connection *ic);

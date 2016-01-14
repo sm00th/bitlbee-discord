@@ -77,7 +77,10 @@ static int discord_buddy_msg(struct im_connection *ic, char *to, char *msg,
     }
   }
 
-  return 1;
+  // If we are here we didn't find an appropriate channel, create it
+  discord_http_create_and_send_msg(ic, to, msg);
+
+  return 0;
 }
 
 static gboolean discord_is_self(struct im_connection *ic, const char *who)

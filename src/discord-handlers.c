@@ -109,9 +109,8 @@ static void discord_handle_presence(struct im_connection *ic,
   imcb_buddy_status(ic, uinfo->name, flags, NULL, NULL);
 }
 
-static void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
-                                   const char *server_id,
-                                   handler_action action)
+void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
+                            const char *server_id, handler_action action)
 {
   discord_data *dd = ic->proto_data;
   server_info *sinfo = get_server_by_id(dd, server_id);
