@@ -498,7 +498,7 @@ void discord_parse_message(struct im_connection *ic)
             const char *lmsg = json_o_str(rsinfo, "last_message_id");
             guint64 lm = g_ascii_strtoull(lmsg, NULL, 10);
             channel_info *cinfo = get_channel_by_id(dd, channel_id, NULL);
-            if (cinfo->last_msg > lm) {
+            if (cinfo != NULL && cinfo->last_msg > lm) {
               char *rlmsg = g_strdup_printf("%lu", cinfo->last_msg);
               cinfo->last_msg = lm;
               discord_http_get_backlog(ic, channel_id);
