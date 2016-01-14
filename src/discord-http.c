@@ -68,6 +68,7 @@ static void discord_http_gateway_cb(struct http_request *req)
       json_value_free(js);
       g_regex_unref(gwregex);
       imc_logout(ic, TRUE);
+      return;
     }
 
     dd->gateway = g_new0(gw_data, 1);
@@ -83,6 +84,7 @@ static void discord_http_gateway_cb(struct http_request *req)
     dd->gateway->addr = g_match_info_fetch(match, 2);
     dd->gateway->path = g_match_info_fetch(match, 3);
 
+    g_match_info_free(match);
     g_regex_unref(gwregex);
 
     if (discord_ws_init(ic, dd) < 0) {
@@ -196,9 +198,11 @@ static gboolean discord_escape_string(const GMatchInfo *match,
   gint pos = 0;
 
   if (g_match_info_fetch_pos(match, 0, &pos, NULL)) {
-    gchar *r = g_strdup_printf("\\%s", g_match_info_fetch(match, 0));
+    gchar *mstring = g_match_info_fetch(match, 0);
+    gchar *r = g_strdup_printf("\\%s", mstring);
     result = g_string_insert(result, pos + (*matches)++, r);
     g_free(r);
+    g_free(mstring);
   }
   return FALSE;
 }
