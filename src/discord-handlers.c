@@ -330,6 +330,28 @@ static void discord_post_message(channel_info *cinfo, const gchar *author,
   }
 }
 
+static gboolean discord_replace_channel(const GMatchInfo *match,
+                                        GString *result,
+                                        gpointer user_data)
+{
+  discord_data *dd = (discord_data *)user_data;
+  gchar *mstring = g_match_info_fetch(match, 0);
+  gchar *chid = g_match_info_fetch(match, 1);
+
+  channel_info *cinfo = get_channel_by_id(dd, chid, NULL);
+  if (cinfo != NULL && cinfo->type == CHANNEL_TEXT) {
+    gchar *r = g_strdup_printf("#%s", cinfo->to.channel.gc->title);
+    result = g_string_append(result, r);
+    g_free(r);
+  } else {
+    result = g_string_append(result, mstring);
+  }
+  g_free(chid);
+  g_free(mstring);
+
+  return FALSE;
+}
+
 static void discord_prepare_message(struct im_connection *ic,
                                     json_value *minfo,
                                     channel_info *cinfo, gboolean is_edit)
@@ -370,7 +392,14 @@ static void discord_prepare_message(struct im_connection *ic,
       }
     }
 
-    discord_post_message(cinfo, author, msg);
+    GRegex *cregex = g_regex_new("<#(\\d+)>", 0, 0, NULL);
+    gchar *fmsg = g_regex_replace_eval(cregex, msg, -1, 0, 0,
+                                       discord_replace_channel,
+                                       ic->proto_data, NULL);
+    g_regex_unref(cregex);
+
+    discord_post_message(cinfo, author, fmsg);
+    g_free(fmsg);
   }
   g_free(author);
   g_free(msg);
