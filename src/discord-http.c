@@ -214,12 +214,7 @@ static gboolean discord_mentions_string(const GMatchInfo *match,
 {
   struct im_connection *ic = (struct im_connection *)user_data;
   discord_data *dd = ic->proto_data;
-  gchar *name = g_match_info_fetch(match, 3);
-
-  if (name == NULL || strlen(name) == 0) {
-    g_free(name);
-    name = g_match_info_fetch(match, 2);
-  }
+  gchar *name = g_match_info_fetch(match, 1);
 
   search_t stype = SEARCH_NAME;
   if (set_getbool(&ic->acc->set, "mention_ignorecase") == TRUE) {
@@ -234,7 +229,7 @@ static gboolean discord_mentions_string(const GMatchInfo *match,
     result = g_string_append(result, id);
     g_free(id);
   } else {
-    gchar *fmatch = g_match_info_fetch(match, 1);
+    gchar *fmatch = g_match_info_fetch(match, 0);
     result = g_string_append(result, fmatch);
     g_free(fmatch);
   }
@@ -255,9 +250,8 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
 
   if (strlen(set_getstr(&ic->acc->set,"mention_suffix")) > 0) {
     gchar *nmsg = NULL;
-    gchar *hlrstr = g_strdup_printf("(@(\\S+)|(\\S+)%s)",
-                                    set_getstr(&ic->acc->set,
-                                               "mention_suffix"));
+    gchar *hlrstr = g_strdup_printf("(\\S+)%s", set_getstr(&ic->acc->set,
+                                                "mention_suffix"));
     GRegex *hlregex = g_regex_new(hlrstr, 0, 0, NULL);
 
     g_free(hlrstr);
@@ -267,6 +261,15 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
     emsg = nmsg;
     g_regex_unref(hlregex);
   }
+
+  gchar *nmsg = NULL;
+  GRegex *hlregex = g_regex_new("@(\\S+)", 0, 0, NULL);
+
+  nmsg = g_regex_replace_eval(hlregex, emsg, -1, 0, 0,
+                              discord_mentions_string, ic, NULL);
+  g_free(emsg);
+  emsg = nmsg;
+  g_regex_unref(hlregex);
 
   g_string_printf(content, "{\"content\":\"%s\"}", emsg);
   g_regex_unref(escregex);
