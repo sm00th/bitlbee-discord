@@ -199,16 +199,12 @@ static gboolean discord_escape_string(const GMatchInfo *match,
                                       GString *result,
                                       gpointer user_data)
 {
-  guint32 *matches = user_data;
-  gint pos = 0;
+  gchar *mstring = g_match_info_fetch(match, 0);
+  gchar *r = g_strdup_printf("\\%s", mstring);
+  result = g_string_append(result, r);
+  g_free(r);
+  g_free(mstring);
 
-  if (g_match_info_fetch_pos(match, 0, &pos, NULL)) {
-    gchar *mstring = g_match_info_fetch(match, 0);
-    gchar *r = g_strdup_printf("\\%s", mstring);
-    result = g_string_insert(result, pos + (*matches)++, r);
-    g_free(r);
-    g_free(mstring);
-  }
   return FALSE;
 }
 
@@ -252,11 +248,10 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
   discord_data *dd = ic->proto_data;
   GString *request = g_string_new("");
   GString *content = g_string_new("");
-  guint32 matches = 0;
   GRegex *escregex = g_regex_new("[\\\\\"]", 0, 0, NULL);
 
   gchar *emsg = g_regex_replace_eval(escregex, msg, -1, 0, 0,
-                                     discord_escape_string, &matches, NULL);
+                                     discord_escape_string, NULL, NULL);
 
   if (strlen(set_getstr(&ic->acc->set,"mention_suffix")) > 0) {
     gchar *nmsg = NULL;
