@@ -253,7 +253,7 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
   GString *request = g_string_new("");
   GString *content = g_string_new("");
   guint32 matches = 0;
-  GRegex *escregex = g_regex_new("[\"]", 0, 0, NULL);
+  GRegex *escregex = g_regex_new("[\\\\\"]", 0, 0, NULL);
 
   gchar *emsg = g_regex_replace_eval(escregex, msg, -1, 0, 0,
                                      discord_escape_string, &matches, NULL);
