@@ -76,6 +76,36 @@ static gint cmp_chan_id(const channel_info *cinfo, const char *chan_id)
   return g_strcmp0(cinfo->id, chan_id);
 }
 
+static gint cmp_chan_name(const channel_info *cinfo, const char *cname)
+{
+  gchar *ciname = NULL;
+  if (cinfo->type == CHANNEL_TEXT) {
+    ciname = cinfo->to.channel.gc->title;
+  } else {
+    ciname = cinfo->to.handle.name;
+  }
+
+  return g_strcmp0(ciname, cname);
+}
+
+static gint cmp_chan_name_ignorecase(const channel_info *cinfo,
+                                     const char *cname)
+{
+  gchar *cfn1 = NULL;
+  if (cinfo->type == CHANNEL_TEXT) {
+    cfn1 = g_utf8_casefold(cinfo->to.channel.gc->title, -1);
+  } else {
+    cfn1 = g_utf8_casefold(cinfo->to.handle.name, -1);
+  }
+
+  gchar *cfn2 = g_utf8_casefold(cname, -1);
+  gint result = g_strcmp0(cfn1, cfn2);
+
+  g_free(cfn1);
+  g_free(cfn2);
+  return result;
+}
+
 static gint cmp_user_id(const user_info *uinfo, const char *user_id)
 {
   return g_strcmp0(uinfo->id, user_id);
@@ -110,22 +140,36 @@ server_info *get_server_by_id(discord_data *dd, const char *server_id)
   return sl == NULL ?  NULL : sl->data;
 }
 
-channel_info *get_channel_by_id(discord_data *dd, const char *channel_id,
-                                const char *server_id)
+channel_info *get_channel(discord_data *dd, const char *channel_id,
+                          const char *server_id, search_t type)
 {
-  GSList *cl = g_slist_find_custom(dd->pchannels, channel_id,
-                                   (GCompareFunc)cmp_chan_id);
+  GSList *cl = NULL;
+  GCompareFunc sfunc = NULL;
+
+  switch(type) {
+    case SEARCH_ID:
+      sfunc = (GCompareFunc)cmp_chan_id;
+      break;
+    case SEARCH_NAME:
+      sfunc = (GCompareFunc)cmp_chan_name;
+      break;
+    case SEARCH_NAME_IGNORECASE:
+      sfunc = (GCompareFunc)cmp_chan_name_ignorecase;
+      break;
+    default:
+      return NULL;
+  }
+
+  cl = g_slist_find_custom(dd->pchannels, channel_id, sfunc);
 
   if (cl == NULL) {
     if (server_id != NULL) {
       server_info *sinfo = get_server_by_id(dd, server_id);
-      cl = g_slist_find_custom(sinfo->channels, channel_id,
-                               (GCompareFunc)cmp_chan_id);
+      cl = g_slist_find_custom(sinfo->channels, channel_id, sfunc);
     } else {
       for (GSList *sl = dd->servers; sl; sl = g_slist_next(sl)) {
         server_info *sinfo = sl->data;
-        cl = g_slist_find_custom(sinfo->channels, channel_id,
-                                 (GCompareFunc)cmp_chan_id);
+        cl = g_slist_find_custom(sinfo->channels, channel_id, sfunc);
         if (cl != NULL) {
           break;
         }

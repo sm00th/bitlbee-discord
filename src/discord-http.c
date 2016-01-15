@@ -29,6 +29,11 @@ typedef struct _casm_data {
   char *msg;
 } casm_data;
 
+typedef struct _mstr_data {
+  struct im_connection *ic;
+  char *sid;
+} mstr_data;
+
 static void discord_http_get(struct im_connection *ic, const char *api_path,
                              http_input_function cb_func, gpointer data)
 {
@@ -212,7 +217,8 @@ static gboolean discord_mentions_string(const GMatchInfo *match,
                                         GString *result,
                                         gpointer user_data)
 {
-  struct im_connection *ic = (struct im_connection *)user_data;
+  mstr_data *md = (mstr_data *)user_data;
+  struct im_connection *ic = md->ic;
   discord_data *dd = ic->proto_data;
   gchar *name = g_match_info_fetch(match, 1);
 
@@ -221,11 +227,42 @@ static gboolean discord_mentions_string(const GMatchInfo *match,
     stype = SEARCH_NAME_IGNORECASE;
   }
 
-  user_info *uinfo = get_user(dd, name, NULL, stype);
+  user_info *uinfo = get_user(dd, name, md->sid, stype);
   g_free(name);
 
   if (uinfo != NULL) {
     gchar *id = g_strdup_printf("<@%s>", uinfo->id);
+    result = g_string_append(result, id);
+    g_free(id);
+  } else {
+    gchar *fmatch = g_match_info_fetch(match, 0);
+    result = g_string_append(result, fmatch);
+    g_free(fmatch);
+  }
+
+  return FALSE;
+}
+
+static gboolean discord_channel_string(const GMatchInfo *match,
+                                       GString *result,
+                                       gpointer user_data)
+{
+  mstr_data *md = (mstr_data *)user_data;
+  struct im_connection *ic = md->ic;
+  discord_data *dd = ic->proto_data;
+
+  gchar *name = g_match_info_fetch(match, 1);
+
+  search_t stype = SEARCH_NAME;
+  if (set_getbool(&ic->acc->set, "mention_ignorecase") == TRUE) {
+    stype = SEARCH_NAME_IGNORECASE;
+  }
+
+  channel_info *cinfo = get_channel(dd, name, md->sid, stype);
+  g_free(name);
+
+  if (cinfo != NULL) {
+    gchar *id = g_strdup_printf("<#%s>", cinfo->id);
     result = g_string_append(result, id);
     g_free(id);
   } else {
@@ -244,6 +281,14 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
   GString *request = g_string_new("");
   GString *content = g_string_new("");
   GRegex *escregex = g_regex_new("[\\\\\"]", 0, 0, NULL);
+  channel_info *cinfo = get_channel(dd, id, NULL, SEARCH_ID);
+  mstr_data *md = g_new0(mstr_data, 1);
+
+  md->ic = ic;
+  if (cinfo != NULL && cinfo->type == CHANNEL_TEXT) {
+    md->sid = cinfo->to.channel.sinfo->id;
+  }
+
 
   gchar *emsg = g_regex_replace_eval(escregex, msg, -1, 0, 0,
                                      discord_escape_string, NULL, NULL);
@@ -256,7 +301,7 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
 
     g_free(hlrstr);
     nmsg = g_regex_replace_eval(hlregex, emsg, -1, 0, 0,
-                                discord_mentions_string, ic, NULL);
+                                discord_mentions_string, md, NULL);
     g_free(emsg);
     emsg = nmsg;
     g_regex_unref(hlregex);
@@ -266,10 +311,18 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
   GRegex *hlregex = g_regex_new("@(\\S+)", 0, 0, NULL);
 
   nmsg = g_regex_replace_eval(hlregex, emsg, -1, 0, 0,
-                              discord_mentions_string, ic, NULL);
+                              discord_mentions_string, md, NULL);
   g_free(emsg);
   emsg = nmsg;
   g_regex_unref(hlregex);
+
+  hlregex = g_regex_new("#(\\S+)", 0, 0, NULL);
+  nmsg = g_regex_replace_eval(hlregex, emsg, -1, 0, 0,
+                              discord_channel_string, md, NULL);
+  g_free(emsg);
+  emsg = nmsg;
+  g_regex_unref(hlregex);
+  g_free(md);
 
   g_string_printf(content, "{\"content\":\"%s\"}", emsg);
   g_regex_unref(escregex);

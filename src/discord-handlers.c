@@ -49,7 +49,7 @@ static void discord_handle_voice_state(struct im_connection *ic,
     return;
   }
 
-  channel_info *cinfo = get_channel_by_id(dd, channel_id, server_id);
+  channel_info *cinfo = get_channel(dd, channel_id, server_id, SEARCH_ID);
   if (cinfo == NULL || cinfo->type != CHANNEL_VOICE ||
       cinfo == uinfo->voice_channel) {
     return;
@@ -145,15 +145,11 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
 
       dd->pchannels = g_slist_prepend(dd->pchannels, ci);
     } else if (g_strcmp0(type, "text") == 0) {
-      char *title;
-
-      title = g_strdup_printf("%s/%s", sinfo->name, name);
-      struct groupchat *gc = imcb_chat_new(ic, title);
+      struct groupchat *gc = imcb_chat_new(ic, name);
       imcb_chat_name_hint(gc, name);
       if (topic != NULL && strlen(topic) > 0) {
         imcb_chat_topic(gc, "root", (char*)topic, 0);
       }
-      g_free(title);
 
       for (GSList *ul = sinfo->users; ul; ul = g_slist_next(ul)) {
         user_info *uinfo = ul->data;
@@ -187,7 +183,7 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
       sinfo->channels = g_slist_prepend(sinfo->channels, ci);
     }
   } else {
-    channel_info *cdata = get_channel_by_id(dd, id, server_id);
+    channel_info *cdata = get_channel(dd, id, server_id, SEARCH_ID);
     if (cdata == NULL) {
       return;
     }
@@ -338,7 +334,7 @@ static gboolean discord_replace_channel(const GMatchInfo *match,
   gchar *mstring = g_match_info_fetch(match, 0);
   gchar *chid = g_match_info_fetch(match, 1);
 
-  channel_info *cinfo = get_channel_by_id(dd, chid, NULL);
+  channel_info *cinfo = get_channel(dd, chid, NULL, SEARCH_ID);
   if (cinfo != NULL && cinfo->type == CHANNEL_TEXT) {
     gchar *r = g_strdup_printf("#%s", cinfo->to.channel.gc->title);
     result = g_string_append(result, r);
@@ -414,8 +410,8 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
     return;
   }
 
-  channel_info *cinfo = get_channel_by_id(dd, json_o_str(minfo, "channel_id"),
-                                          NULL);
+  channel_info *cinfo = get_channel(dd, json_o_str(minfo, "channel_id"),
+                                    NULL, SEARCH_ID);
   if (cinfo == NULL) {
     return;
   }
@@ -533,7 +529,7 @@ void discord_parse_message(struct im_connection *ic)
             if (lmsg != NULL) {
               lm = g_ascii_strtoull(lmsg, NULL, 10);
             }
-            channel_info *cinfo = get_channel_by_id(dd, channel_id, NULL);
+            channel_info *cinfo = get_channel(dd, channel_id, NULL, SEARCH_ID);
             if (cinfo != NULL && cinfo->last_msg > lm) {
               char *rlmsg = g_strdup_printf("%lu", cinfo->last_msg);
               cinfo->last_msg = lm;

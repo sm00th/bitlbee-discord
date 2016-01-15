@@ -103,7 +103,8 @@ This section describes options available throug "account set" bitlbee command
     function.
 
   - mention_ignorecase (type: boolean; default: off)
-    Ignore case when looking for outgoing mentions.
+    Ignore case when looking for outgoing mentions. This also affects channel
+    mentions.
 
 Bugs
 ----
