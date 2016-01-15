@@ -319,6 +319,10 @@ static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
 static void discord_post_message(channel_info *cinfo, const gchar *author,
                                  gchar *msg)
 {
+  if (strlen(msg) == 0) {
+    return;
+  }
+
   if (cinfo->type == CHANNEL_PRIVATE) {
     imcb_buddy_msg(cinfo->to.handle.ic, author, msg, 0, 0);
   } else if (cinfo->type == CHANNEL_TEXT) {
@@ -396,6 +400,14 @@ static void discord_prepare_message(struct im_connection *ic,
 
     discord_post_message(cinfo, author, fmsg);
     g_free(fmsg);
+  }
+
+  json_value *attachments = json_o_get(minfo, "attachments");
+  if (attachments != NULL && attachments->type == json_array) {
+    for (int aidx = 0; aidx < attachments->u.array.length; aidx++) {
+      const char *url = json_o_str(attachments->u.array.values[aidx], "url");
+      discord_post_message(cinfo, author, (char *)url);
+    }
   }
   g_free(author);
   g_free(msg);
