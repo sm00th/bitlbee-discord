@@ -19,7 +19,8 @@
 typedef enum {
   SEARCH_UNKNOWN,
   SEARCH_ID,
-  SEARCH_NAME
+  SEARCH_NAME,
+  SEARCH_NAME_IGNORECASE
 } search_t;
 
 channel_info *get_channel_by_id(discord_data *dd, const char *channel_id,

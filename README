@@ -102,6 +102,9 @@ This section describes options available throug "account set" bitlbee command
     parsing your outgoing messages. Setting this to "" will disable this
     function.
 
+  - mention_ignorecase (type: boolean; default: off)
+    Ignore case when looking for outgoing mentions.
+
 Bugs
 ----
 Plugin is in early development stages, so there should be plenty, please report

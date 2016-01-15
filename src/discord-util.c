@@ -86,6 +86,17 @@ static gint cmp_user_name(const user_info *uinfo, const char *uname)
   return g_strcmp0(uinfo->name, uname);
 }
 
+static gint cmp_user_name_ignorecase(const user_info *uinfo, const char *uname)
+{
+  gchar *cfn1 = g_utf8_casefold(uinfo->name, -1);
+  gchar *cfn2 = g_utf8_casefold(uname, -1);
+  gint result = g_strcmp0(cfn1, cfn2);
+
+  g_free(cfn1);
+  g_free(cfn2);
+  return result;
+}
+
 static gint cmp_server_id(const server_info *sinfo, const char *server_id)
 {
   return g_strcmp0(sinfo->id, server_id);
@@ -137,6 +148,9 @@ user_info *get_user(discord_data *dd, const char *uname,
       break;
     case SEARCH_NAME:
       sfunc = (GCompareFunc)cmp_user_name;
+      break;
+    case SEARCH_NAME_IGNORECASE:
+      sfunc = (GCompareFunc)cmp_user_name_ignorecase;
       break;
     default:
       return NULL;

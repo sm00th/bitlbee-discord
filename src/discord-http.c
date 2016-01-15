@@ -216,7 +216,8 @@ static gboolean discord_mentions_string(const GMatchInfo *match,
                                         GString *result,
                                         gpointer user_data)
 {
-  discord_data *dd = (discord_data *)user_data;
+  struct im_connection *ic = (struct im_connection *)user_data;
+  discord_data *dd = ic->proto_data;
   gchar *name = g_match_info_fetch(match, 3);
 
   if (name == NULL || strlen(name) == 0) {
@@ -224,7 +225,12 @@ static gboolean discord_mentions_string(const GMatchInfo *match,
     name = g_match_info_fetch(match, 2);
   }
 
-  user_info *uinfo = get_user(dd, name, NULL, SEARCH_NAME);
+  search_t stype = SEARCH_NAME;
+  if (set_getbool(&ic->acc->set, "mention_ignorecase") == TRUE) {
+    stype = SEARCH_NAME_IGNORECASE;
+  }
+
+  user_info *uinfo = get_user(dd, name, NULL, stype);
   g_free(name);
 
   if (uinfo != NULL) {
@@ -261,7 +267,7 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
 
     g_free(hlrstr);
     nmsg = g_regex_replace_eval(hlregex, emsg, -1, 0, 0,
-                                discord_mentions_string, dd, NULL);
+                                discord_mentions_string, ic, NULL);
     g_free(emsg);
     emsg = nmsg;
     g_regex_unref(hlregex);
