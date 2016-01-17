@@ -290,11 +290,11 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
   }
 
 
+  gchar *nmsg = NULL;
   gchar *emsg = g_regex_replace_eval(escregex, msg, -1, 0, 0,
                                      discord_escape_string, NULL, NULL);
 
   if (strlen(set_getstr(&ic->acc->set,"mention_suffix")) > 0) {
-    gchar *nmsg = NULL;
     gchar *hlrstr = g_strdup_printf("(\\S+)%s", set_getstr(&ic->acc->set,
                                                 "mention_suffix"));
     GRegex *hlregex = g_regex_new(hlrstr, 0, 0, NULL);
@@ -307,7 +307,6 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
     g_regex_unref(hlregex);
   }
 
-  gchar *nmsg = NULL;
   GRegex *hlregex = g_regex_new("@(\\S+)", 0, 0, NULL);
 
   nmsg = g_regex_replace_eval(hlregex, emsg, -1, 0, 0,
@@ -323,6 +322,12 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
   emsg = nmsg;
   g_regex_unref(hlregex);
   g_free(md);
+
+  if (g_str_has_prefix(emsg, "/me ")) {
+    nmsg = g_strdup_printf("*%s*", emsg + 4);
+    g_free(emsg);
+    emsg = nmsg;
+  }
 
   g_string_printf(content, "{\"content\":\"%s\"}", emsg);
   g_regex_unref(escregex);
