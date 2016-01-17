@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Artem Savkov <artem.savkov@gmail.com>
+ * Copyright 2015-2016 Artem Savkov <artem.savkov@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -189,14 +189,14 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
     }
 
     if (action == ACTION_DELETE) {
-      GSList *clist;
+      GSList **clist;
       if (cdata->type == CHANNEL_PRIVATE) {
-        clist = dd->pchannels;
+        clist = &dd->pchannels;
       } else {
-        clist = sinfo->channels;
+        clist = &sinfo->channels;
       }
 
-      clist = g_slist_remove(clist, cdata);
+      *clist = g_slist_remove(*clist, cdata);
       free_channel_info(cdata);
     } else if (action == ACTION_UPDATE) {
       if (cdata->type == CHANNEL_TEXT) {
