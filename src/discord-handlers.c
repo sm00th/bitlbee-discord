@@ -398,7 +398,8 @@ static void discord_prepare_message(struct im_connection *ic,
                                        ic->proto_data, NULL);
     g_regex_unref(cregex);
 
-    if (g_regex_match_simple("^\\*.*\\*$", fmsg, 0, 0)) {
+    if (set_getbool(&ic->acc->set, "incoming_me_translation") == TRUE &&
+        g_regex_match_simple("^\\*.*\\*$", fmsg, 0, 0) == TRUE) {
       GString *tstr = g_string_new(fmsg);
       tstr = g_string_erase(tstr, 0, 1);
       tstr = g_string_truncate(tstr, tstr->len - 1);

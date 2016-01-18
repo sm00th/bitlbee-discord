@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Artem Savkov <artem.savkov@gmail.com>
+ * Copyright 2015-2016 Artem Savkov <artem.savkov@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,6 +32,7 @@ static void discord_init(account_t *acc)
   s = set_add(&acc->set, "urlinfo_handle", "urlinfo", NULL, acc);
   s = set_add(&acc->set, "mention_suffix", ":", NULL, acc);
   s = set_add(&acc->set, "mention_ignorecase", "off", set_eval_bool, acc);
+  s = set_add(&acc->set, "incoming_me_translation", "on", set_eval_bool, acc);
 
   s = set_add(&acc->set, "max_backlog", "50", set_eval_int, acc);
   s->flags |= ACC_SET_OFFLINE_ONLY;
