@@ -89,6 +89,7 @@ discord_ws_callback(struct lws *wsi,
         imcb_error(ic, in);
       }
       b_event_remove(dd->keepalive_loop_id);
+      dd->keepalive_loop_id = 0;
       dd->state = WS_CLOSING;
       break;
     case LWS_CALLBACK_CLIENT_WRITEABLE:
@@ -123,6 +124,7 @@ discord_ws_callback(struct lws *wsi,
       }
     case LWS_CALLBACK_CLOSED:
       b_event_remove(dd->keepalive_loop_id);
+      dd->keepalive_loop_id = 0;
       dd->state = WS_CLOSING;
       lws_cancel_service(dd->lwsctx);
       break;
@@ -212,6 +214,10 @@ int discord_ws_init(struct im_connection *ic, discord_data *dd)
 
 void discord_ws_cleanup(discord_data *dd)
 {
+  if (dd->keepalive_loop_id > 0) {
+    b_event_remove(dd->keepalive_loop_id);
+    dd->keepalive_loop_id = 0;
+  }
   if (dd->lwsctx != NULL) {
     lws_context_destroy(dd->lwsctx);
   }
