@@ -205,7 +205,8 @@ int discord_ws_init(struct im_connection *ic, discord_data *dd)
   }
 
   dd->lws = lws_client_connect(dd->lwsctx, dd->gateway->addr,
-                                        443, dd->gateway->wss,
+                                        dd->gateway->wss ? 443 : 80,
+                                        dd->gateway->wss,
                                         dd->gateway->path, dd->gateway->addr,
                                         "discordapp.com",
                                         protocols[0].name, -1);
