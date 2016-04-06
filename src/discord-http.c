@@ -94,6 +94,10 @@ static void discord_http_gateway_cb(struct http_request *req)
     dd->gateway->addr = g_match_info_fetch(match, 2);
     dd->gateway->path = g_match_info_fetch(match, 3);
 
+    if (dd->gateway->path == NULL) {
+      dd->gateway->path = g_strdup("/");
+    }
+
     g_match_info_free(match);
     g_regex_unref(gwregex);
 
