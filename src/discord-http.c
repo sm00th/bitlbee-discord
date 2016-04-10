@@ -337,7 +337,7 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
   g_free(md);
 
   if (g_str_has_prefix(emsg, "/me ")) {
-    nmsg = g_strdup_printf("*%s*", emsg + 4);
+    nmsg = g_strdup_printf("_%s_", emsg + 4);
     g_free(emsg);
     emsg = nmsg;
   }
