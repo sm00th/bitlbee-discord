@@ -297,6 +297,15 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
   gchar *nmsg = NULL;
   gchar *emsg = g_regex_replace_eval(escregex, msg, -1, 0, 0,
                                      discord_escape_string, NULL, NULL);
+  g_regex_unref(escregex);
+
+  escregex = g_regex_new("\t", 0, 0, NULL);
+  nmsg = g_regex_replace_literal(escregex, emsg, -1, 0, "\\t", 0, NULL);
+
+  g_free(emsg);
+  emsg = nmsg;
+
+  g_regex_unref(escregex);
 
   if (strlen(set_getstr(&ic->acc->set,"mention_suffix")) > 0) {
     gchar *hlrstr = g_strdup_printf("(\\S+)%s", set_getstr(&ic->acc->set,
@@ -334,7 +343,6 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
   }
 
   g_string_printf(content, "{\"content\":\"%s\"}", emsg);
-  g_regex_unref(escregex);
   g_free(emsg);
   g_string_printf(request, "POST /api/channels/%s/messages HTTP/1.1\r\n"
                   "Host: %s\r\n"
