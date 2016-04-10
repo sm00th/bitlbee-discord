@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Artem Savkov <artem.savkov@gmail.com>
+ * Copyright 2015-2016 Artem Savkov <artem.savkov@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -222,4 +222,18 @@ void discord_ws_cleanup(discord_data *dd)
   if (dd->lwsctx != NULL) {
     lws_context_destroy(dd->lwsctx);
   }
+}
+
+void discord_ws_set_status(discord_data *dd, gboolean idle, gchar *message)
+{
+  GString *buf = g_string_new("");
+  if (idle == TRUE) {
+    g_string_printf(buf, "{\"op\":3,\"d\":{\"idle_since\":%tu,\"game\":{\"name\":\"%s\"}}}", time(NULL), message);
+  } else if (message != NULL) {
+    g_string_printf(buf, "{\"op\":3,\"d\":{\"idle_since\":null,\"game\":{\"name\":\"%s\"}}}", message);
+  } else {
+    g_string_printf(buf, "{\"op\":3,\"d\":{\"idle_since\":null,\"game\":{\"name\":null}}}");
+  }
+  discord_ws_send_payload(dd->lws, buf->str, buf->len);
+  g_string_free(buf, TRUE);
 }

@@ -36,6 +36,9 @@ static void discord_init(account_t *acc)
 
   s = set_add(&acc->set, "max_backlog", "50", set_eval_int, acc);
   s->flags |= ACC_SET_OFFLINE_ONLY;
+
+  acc->flags |= ACC_FLAG_AWAY_MESSAGE;
+  acc->flags |= ACC_FLAG_STATUS_MESSAGE;
 }
 
 static void discord_login(account_t *acc)
@@ -91,6 +94,23 @@ static gboolean discord_is_self(struct im_connection *ic, const char *who)
   return !g_strcmp0(dd->uname, who);
 }
 
+static GList *discord_away_states(struct im_connection *ic)
+{
+    static GList *m = NULL;
+
+    m = g_list_append(m, "Idle");
+
+    return m;
+}
+
+static void discord_set_away(struct im_connection *ic, char *state,
+                             char *message)
+{
+  discord_data *dd = ic->proto_data;
+
+  discord_ws_set_status(dd, state != NULL, message);
+}
+
 G_MODULE_EXPORT void init_plugin(void)
 {
   struct prpl *dpp;
@@ -103,7 +123,9 @@ G_MODULE_EXPORT void init_plugin(void)
     .chat_msg = discord_chat_msg,
     .buddy_msg = discord_buddy_msg,
     .handle_cmp = g_strcmp0,
-    .handle_is_self = discord_is_self
+    .handle_is_self = discord_is_self,
+    .away_states = discord_away_states,
+    .set_away = discord_set_away
   };
   dpp = g_memdup(&pp, sizeof pp);
   register_protocol(dpp);

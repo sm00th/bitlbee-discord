@@ -21,3 +21,4 @@ gboolean discord_ws_keepalive_loop(gpointer data, gint fd,
 
 int discord_ws_init(struct im_connection *ic, discord_data *dd);
 void discord_ws_cleanup(discord_data *dd);
+void discord_ws_set_status(discord_data *dd, gboolean idle, gchar *message);
