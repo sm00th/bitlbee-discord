@@ -367,6 +367,19 @@ static void discord_prepare_message(struct im_connection *ic,
 
   gchar *author = discord_canonize_name(json_o_str(json_o_get(minfo,
                                         "author"), "username"));
+
+  if (set_getbool(&ic->acc->set, "incoming_me_translation") == TRUE &&
+      g_regex_match_simple("^[\\*_].*[\\*_]$", msg, 0, 0) == TRUE) {
+    GString *tstr = g_string_new(msg);
+    tstr = g_string_erase(tstr, 0, 1);
+    tstr = g_string_truncate(tstr, tstr->len - 1);
+    tstr = g_string_prepend(tstr, "/me ");
+
+    g_free(msg);
+    msg = tstr->str;
+    g_string_free(tstr, FALSE);
+  }
+
   if (cinfo->type == CHANNEL_PRIVATE) {
     if (g_strcmp0(author, cinfo->to.handle.name) == 0) {
       discord_post_message(cinfo, cinfo->to.handle.name, msg);
@@ -397,18 +410,6 @@ static void discord_prepare_message(struct im_connection *ic,
                                        discord_replace_channel,
                                        ic->proto_data, NULL);
     g_regex_unref(cregex);
-
-    if (set_getbool(&ic->acc->set, "incoming_me_translation") == TRUE &&
-        g_regex_match_simple("^[\\*_].*[\\*_]$", fmsg, 0, 0) == TRUE) {
-      GString *tstr = g_string_new(fmsg);
-      tstr = g_string_erase(tstr, 0, 1);
-      tstr = g_string_truncate(tstr, tstr->len - 1);
-      tstr = g_string_prepend(tstr, "/me ");
-
-      g_free(fmsg);
-      fmsg = tstr->str;
-      g_string_free(tstr, FALSE);
-    }
 
     discord_post_message(cinfo, author, fmsg);
     g_free(fmsg);
