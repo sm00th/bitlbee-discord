@@ -224,3 +224,34 @@ char *discord_canonize_name(const char *name)
   g_regex_unref(regex);
   return cname;
 }
+
+static gboolean discord_escape(const GMatchInfo *match, GString *result,
+                               gpointer user_data)
+{
+  gchar *mstring = g_match_info_fetch(match, 0);
+  gchar *r = g_strdup_printf("\\%s", mstring);
+  result = g_string_append(result, r);
+  g_free(r);
+  g_free(mstring);
+
+  return FALSE;
+}
+
+char *discord_escape_string(const char *msg)
+{
+  GRegex *escregex = g_regex_new("[\\\\\"]", 0, 0, NULL);
+  char *nmsg = NULL;
+  char *emsg = g_regex_replace_eval(escregex, msg, -1, 0, 0,
+                                     discord_escape, NULL, NULL);
+  g_regex_unref(escregex);
+
+  escregex = g_regex_new("\t", 0, 0, NULL);
+  nmsg = g_regex_replace_literal(escregex, emsg, -1, 0, "\\t", 0, NULL);
+
+  g_free(emsg);
+  emsg = nmsg;
+
+  g_regex_unref(escregex);
+
+  return emsg;
+}

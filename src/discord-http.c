@@ -204,19 +204,6 @@ void discord_http_get_backlog(struct im_connection *ic, const char *channel_id)
   g_string_free(api, TRUE);
 }
 
-static gboolean discord_escape_string(const GMatchInfo *match,
-                                      GString *result,
-                                      gpointer user_data)
-{
-  gchar *mstring = g_match_info_fetch(match, 0);
-  gchar *r = g_strdup_printf("\\%s", mstring);
-  result = g_string_append(result, r);
-  g_free(r);
-  g_free(mstring);
-
-  return FALSE;
-}
-
 static gboolean discord_mentions_string(const GMatchInfo *match,
                                         GString *result,
                                         gpointer user_data)
@@ -284,7 +271,6 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
   discord_data *dd = ic->proto_data;
   GString *request = g_string_new("");
   GString *content = g_string_new("");
-  GRegex *escregex = g_regex_new("[\\\\\"]", 0, 0, NULL);
   channel_info *cinfo = get_channel(dd, id, NULL, SEARCH_ID);
   mstr_data *md = g_new0(mstr_data, 1);
 
@@ -293,19 +279,8 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
     md->sid = cinfo->to.channel.sinfo->id;
   }
 
-
   gchar *nmsg = NULL;
-  gchar *emsg = g_regex_replace_eval(escregex, msg, -1, 0, 0,
-                                     discord_escape_string, NULL, NULL);
-  g_regex_unref(escregex);
-
-  escregex = g_regex_new("\t", 0, 0, NULL);
-  nmsg = g_regex_replace_literal(escregex, emsg, -1, 0, "\\t", 0, NULL);
-
-  g_free(emsg);
-  emsg = nmsg;
-
-  g_regex_unref(escregex);
+  gchar *emsg = discord_escape_string(msg);
 
   if (strlen(set_getstr(&ic->acc->set,"mention_suffix")) > 0) {
     gchar *hlrstr = g_strdup_printf("(\\S+)%s", set_getstr(&ic->acc->set,

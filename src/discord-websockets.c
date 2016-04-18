@@ -18,6 +18,7 @@
 
 #include "discord-websockets.h"
 #include "discord-handlers.h"
+#include "discord-util.h"
 
 static int discord_ws_send_payload(struct lws *wsi, const char *pload,
                                    size_t psize)
@@ -227,13 +228,20 @@ void discord_ws_cleanup(discord_data *dd)
 void discord_ws_set_status(discord_data *dd, gboolean idle, gchar *message)
 {
   GString *buf = g_string_new("");
+  gchar *msg = NULL;
+
+  if (message != NULL) {
+    msg = discord_escape_string(message);
+  }
+
   if (idle == TRUE) {
-    g_string_printf(buf, "{\"op\":3,\"d\":{\"idle_since\":%tu,\"game\":{\"name\":\"%s\"}}}", time(NULL), message);
+    g_string_printf(buf, "{\"op\":3,\"d\":{\"idle_since\":%tu,\"game\":{\"name\":\"%s\"}}}", time(NULL), msg);
   } else if (message != NULL) {
-    g_string_printf(buf, "{\"op\":3,\"d\":{\"idle_since\":null,\"game\":{\"name\":\"%s\"}}}", message);
+    g_string_printf(buf, "{\"op\":3,\"d\":{\"idle_since\":null,\"game\":{\"name\":\"%s\"}}}", msg);
   } else {
     g_string_printf(buf, "{\"op\":3,\"d\":{\"idle_since\":null,\"game\":{\"name\":null}}}");
   }
   discord_ws_send_payload(dd->lws, buf->str, buf->len);
   g_string_free(buf, TRUE);
+  g_free(msg);
 }
