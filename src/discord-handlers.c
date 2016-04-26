@@ -223,17 +223,24 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
   char *name = discord_canonize_name(json_o_str(uinfo, "username"));
 
   if (action == ACTION_CREATE) {
-    if (name && !bee_user_by_handle(ic->bee, ic, name)) {
-      user_info *ui = g_new0(user_info, 1);
+    if (name) {
+      user_info *ui = NULL;
+      bee_user_t *bu = bee_user_by_handle(ic->bee, ic, name);
 
-      imcb_add_buddy(ic, name, NULL);
-      imcb_buddy_status(ic, name, 0, NULL, NULL);
+      if (bu == NULL) {
+        imcb_add_buddy(ic, name, NULL);
+        imcb_buddy_status(ic, name, 0, NULL, NULL);
+        bu = bee_user_by_handle(ic->bee, ic, name);
+      }
 
-      ui->user = bee_user_by_handle(ic->bee, ic, name);
-      ui->id = g_strdup(id);
-      ui->name = g_strdup(name);
+      if (bu != NULL) {
+        ui = g_new0(user_info, 1);
+        ui->user = bu;
+        ui->id = g_strdup(id);
+        ui->name = g_strdup(name);
 
-      sinfo->users = g_slist_prepend(sinfo->users, ui);
+        sinfo->users = g_slist_prepend(sinfo->users, ui);
+      }
     }
   } else if (action == ACTION_DELETE) {
     user_info *udata = get_user(dd, id, server_id, SEARCH_ID);
@@ -241,9 +248,13 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
     if (udata == NULL) {
       return;
     }
-    imcb_remove_buddy(ic, name, NULL);
     sinfo->users = g_slist_remove(sinfo->users, udata);
     free_user_info(udata);
+
+    udata = get_user(dd, name, NULL, SEARCH_NAME);
+    if (udata == NULL) {
+      imcb_remove_buddy(ic, name, NULL);
+    }
   }
 
   g_free(name);
@@ -306,11 +317,14 @@ static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
     }
 
     if (action == ACTION_DELETE) {
+      dd->servers = g_slist_remove(dd->servers, sdata);
       for (GSList *ul = sdata->users; ul; ul = g_slist_next(ul)) {
         user_info *uinfo = ul->data;
-        imcb_remove_buddy(ic, uinfo->name, NULL);
+        user_info *udata = get_user(dd, uinfo->name, NULL, SEARCH_NAME);
+        if (udata == NULL) {
+          imcb_remove_buddy(ic, uinfo->name, NULL);
+        }
       }
-      dd->servers = g_slist_remove(dd->servers, sdata);
       free_server_info(sdata);
     }
   }
