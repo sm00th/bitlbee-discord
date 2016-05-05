@@ -89,7 +89,8 @@ static void discord_handle_presence(struct im_connection *ic,
 
   if (g_strcmp0(status, "online") == 0) {
     flags = BEE_USER_ONLINE;
-  } else if (g_strcmp0(status, "idle") == 0) {
+  } else if (g_strcmp0(status, "idle") == 0 ||
+             set_getbool(&ic->acc->set, "never_offline") == TRUE) {
     flags = BEE_USER_ONLINE | BEE_USER_AWAY;
   }
 
@@ -229,7 +230,12 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
 
       if (bu == NULL) {
         imcb_add_buddy(ic, name, NULL);
-        imcb_buddy_status(ic, name, 0, NULL, NULL);
+        if (set_getbool(&ic->acc->set, "never_offline") == TRUE) {
+          imcb_buddy_status(ic, name, BEE_USER_ONLINE | BEE_USER_AWAY, NULL,
+                            NULL);
+        } else {
+          imcb_buddy_status(ic, name, 0, NULL, NULL);
+        }
         bu = bee_user_by_handle(ic->bee, ic, name);
       }
 

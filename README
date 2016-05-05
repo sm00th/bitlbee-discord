@@ -56,7 +56,7 @@ calling ./configure with --with-plugindir=/path/to/plugindir option.
 
 Usage
 -----
-Plugint adds 'discord' protocol to bitlbee, add your account as usual:
+Plugin adds 'discord' protocol to bitlbee, add your account as usual:
 
   > account add discord <email> <password>
   > account discord on
@@ -106,14 +106,19 @@ This section describes options available throug "account set" bitlbee command
     Ignore case when looking for outgoing mentions. This also affects channel
     mentions.
 
-  - incoming_me_translation(type: boolean; default: on)
+  - incoming_me_translation (type: boolean; default: on)
     This option controls wheter bitlbee-discord will translate incoming
     messages that are fully italized(that is enclosed in '*' characters) to
     '/me' messages.
+
+  - never_offline (type: boolean; default: off)
+    Contacts from this account will never appear as offline and will be marked
+    away instead.
 
 Bugs
 ----
 Plugin is in early development stages, so there should be plenty, please report
 them at github: https://github.com/sm00th/bitlbee-discord/issues
 For questions, bitlbee-discord breakage demonstrations and chitchat you can
-join the following discord server: https://discord.gg/0lUXEAZXmvW3ovUC
+join the following discord server: https://discord.gg/0lUXEAZXmvW3ovUC or ping
+trac3r on irc.oftc.net/#bitlbee.
