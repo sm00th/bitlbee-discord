@@ -411,7 +411,7 @@ static void discord_prepare_message(struct im_connection *ic,
         json_value *uinfo = mentions->u.array.values[midx];
         gchar *uname = discord_canonize_name(json_o_str(uinfo, "username"));
         gchar *newmsg = NULL;
-        gchar *idstr = g_strdup_printf("<@%s>", json_o_str(uinfo, "id"));
+        gchar *idstr = g_strdup_printf("<@!?%s>", json_o_str(uinfo, "id"));
         gchar *unstr = g_strdup_printf("@%s", uname);
         GRegex *regex = g_regex_new(idstr, 0, 0, NULL);
         newmsg = g_regex_replace_literal(regex, msg, -1, 0,
