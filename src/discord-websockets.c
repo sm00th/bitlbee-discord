@@ -153,8 +153,10 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     }
 
     if ((buf & 0x0f) == 8) {
-      b_event_remove(dd->keepalive_loop_id);
-      dd->keepalive_loop_id = 0;
+      if (dd->keepalive_loop_id) {
+        b_event_remove(dd->keepalive_loop_id);
+        dd->keepalive_loop_id = 0;
+      }
       dd->state = WS_CLOSING;
       return FALSE;
     }
