@@ -19,14 +19,12 @@ lib_LTLIBRARIES = discord.la
 discord_la_CFLAGS  = \
 	$(BITLBEE_CFLAGS) \
 	$(GLIB_CFLAGS) \
-	$(LIBWEBSOCKETS_CFLAGS) \
 	-Wall
 
 discord_la_LDFLAGS = \
 	-module \
 	-avoid-version \
-	$(GLIB_LIBS) \
-	$(LIBWEBSOCKETS_LIBS)
+	$(GLIB_LIBS)
 
 discord_la_SOURCES = \
 	discord.c \

@@ -47,8 +47,6 @@ typedef struct _discord_data {
   char     *id;
   char     *uname;
   gw_data  *gateway;
-  struct lws_context *lwsctx;
-  struct lws *lws;
   GSList   *servers;
   GSList   *pchannels;
   gint     main_loop_id;
@@ -56,6 +54,9 @@ typedef struct _discord_data {
   ws_state state;
   gint     keepalive_interval;
   gint     keepalive_loop_id;
+  void     *ssl;
+  int      sslfd;
+  int      inpa;
 } discord_data;
 
 typedef struct _server_info {

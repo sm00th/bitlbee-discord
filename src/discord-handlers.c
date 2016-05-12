@@ -506,10 +506,10 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
   }
 }
 
-void discord_parse_message(struct im_connection *ic)
+void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
 {
   discord_data *dd = ic->proto_data;
-  json_value *js = json_parse(dd->ws_buf->str, dd->ws_buf->len);
+  json_value *js = json_parse(buf, size);
   if (!js || js->type != json_object) {
     imcb_error(ic, "Failed to parse json reply.");
     imc_logout(ic, TRUE);
@@ -632,7 +632,7 @@ void discord_parse_message(struct im_connection *ic)
     // Ignoring those for now
   } else {
     g_print("%s: unhandled event: %s\n", __func__, event);
-    g_print("%s\n", dd->ws_buf->str);
+    g_print("%s\n", buf);
   }
 
 exit:

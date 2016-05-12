@@ -24,11 +24,6 @@ Build dependencies
   package, usually bitlbee-dev or bitlbee-devel. If bitlbee was built from
   source don't forget to do `make install-dev`.
 
-- libwebsockets >= 1.6 and headers (https://libwebsockets.org)
-  Archlinux users can use libwebsocket-git from AUR, others are out of luck and
-  will have to build it from source for now, debian's version in sid is too old
-  (1.2), fedora23 doesn't provide this package at all.
-
 - glib2 and headers => 2.32
   The library itself is usually installed as a dependency of bitlbee, headers
   need to be installed separately. In debian the package containing them is

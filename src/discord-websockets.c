@@ -14,24 +14,93 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <libwebsockets.h>
+#include <bitlbee/ssl_client.h>
+#include <bitlbee/events.h>
 
 #include "discord-websockets.h"
 #include "discord-handlers.h"
 #include "discord-util.h"
+#include "discord.h"
 
-static int discord_ws_send_payload(struct lws *wsi, const char *pload,
-                                   size_t psize)
+static gchar *discord_ws_mask(guint32 key, const char *pload,
+                              guint64 psize)
 {
-  int ret = 0;
-  unsigned char *buf = g_malloc0(LWS_SEND_BUFFER_PRE_PADDING + \
-                                 psize + LWS_SEND_BUFFER_POST_PADDING);
-  strncpy((char*)&buf[LWS_SEND_BUFFER_PRE_PADDING], pload, psize);
-  ret = lws_write(wsi, &buf[LWS_SEND_BUFFER_PRE_PADDING], psize,
-                           LWS_WRITE_TEXT);
+  gchar *ret = g_malloc0(psize);
+
+  for (guint64 i = 0; i < psize; i++) {
+    ret[i] = pload[i] ^ *((gchar*)&key + (i % 4));
+  }
+
+  return ret;
+}
+
+static int discord_ws_send_payload(discord_data *dd, const char *pload,
+                                   guint64 psize)
+{
+  gchar *buf;
+  guint64 hlen = 6;
+  size_t ret = 0;
+  guint32 mkey = g_random_int();
+  gchar *mpload = discord_ws_mask(mkey, pload, psize);
+
+  if (psize > 125) {
+    if (psize > G_MAXUINT16) {
+      hlen += 8;
+    } else {
+      hlen += 2;
+    }
+  }
+
+  buf = g_malloc0(hlen + psize);
+
+  buf[0] = 0x81; // Text frame
+  if (psize < 126) {
+    buf[1] = (char)psize | 0x80;
+  } else if (psize > G_MAXUINT16) {
+    guint64 esize = GUINT64_TO_BE(psize);
+    buf[1] = 127 | 0x80;
+    memcpy(buf + 2, &esize, sizeof(esize));
+  } else {
+    guint16 esize = GUINT16_TO_BE(psize);
+    buf[1] = 126 | 0x80;
+    memcpy(buf + 2, &esize, sizeof(esize));
+  }
+
+  memcpy(buf + hlen - sizeof(mkey), &mkey, sizeof(mkey));
+  memcpy(buf + hlen, mpload, psize);
+  g_free(mpload);
+
+  ret = ssl_write(dd->ssl, buf, hlen + psize);
+
   g_free(buf);
   return ret;
 }
+static gboolean discord_ws_writable(gpointer data, int source,
+                                    b_input_condition cond)
+{
+  discord_data *dd = (discord_data*)data;
+  if (dd->state == WS_CONNECTED) {
+    GString *buf = g_string_new("");
+    g_string_printf(buf, "{\"d\":{\"v\":3,\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"}},\"op\":2}", dd->token);
+    discord_ws_send_payload(dd, buf->str, buf->len);
+    g_string_free(buf, TRUE);
+  } else if (dd->state == WS_READY) {
+    GString *buf = g_string_new("");
+
+    g_string_printf(buf, "{\"op\":1,\"d\":%tu}", time(NULL));
+    discord_ws_send_payload(dd, buf->str, buf->len);
+    g_string_free(buf, TRUE);
+  } else {
+    g_print("%s: Unhandled writable callback\n", __func__);
+  }
+  return FALSE;
+}
+
+static void discord_ws_callback_on_writable(discord_data *dd)
+{
+  b_input_add(dd->sslfd, B_EV_IO_WRITE, discord_ws_writable, dd);
+}
+
 
 gboolean discord_ws_keepalive_loop(gpointer data, gint fd,
                                    b_input_condition cond)
@@ -40,177 +109,170 @@ gboolean discord_ws_keepalive_loop(gpointer data, gint fd,
   discord_data *dd = ic->proto_data;
 
   if (dd->state == WS_READY) {
-    lws_callback_on_writable(dd->lws);
+    discord_ws_callback_on_writable(dd);
   }
   return TRUE;
 }
 
-static gboolean discord_ws_service_loop(gpointer data, gint fd,
-                                        b_input_condition cond)
+static gboolean discord_ws_in_cb(gpointer data, int source,
+                                 b_input_condition cond)
 {
-  struct im_connection *ic = data;
-
+  struct im_connection *ic = (struct im_connection *)data;
   discord_data *dd = ic->proto_data;
 
-  lws_service(dd->lwsctx, 0);
+  if (dd->state == WS_CONNECTING) {
+    gchar buf[4096] = "";
+    ssl_read(dd->ssl, buf, sizeof(buf));
+    if (g_strrstr_len(buf, 25, "101 Switching") != NULL && \
+        g_str_has_suffix(buf, "\r\n\r\n")) {
+      dd->state = WS_CONNECTED;
+      discord_ws_callback_on_writable(dd);
+    } else {
+      imcb_error(ic, "Failed to switch to websocket mode");
+      imc_logout(ic, TRUE);
+      return FALSE;
+    }
+  } else {
+    gchar buf = 0 ;
+    guint64 len = 0;
+    gboolean mask = FALSE;
+    guint32 mkey = 0;
+    gpointer rdata = NULL;
+    guint64 read = 0;
 
-  if (dd->state == WS_CLOSING) {
-    imc_logout(ic, TRUE);
+    if (ssl_read(dd->ssl, &buf, 1) < 1) {
+      imcb_error(ic, "Failed to read data.");
+      imc_logout(ic, TRUE);
+      return FALSE;
+    }
+
+    if ((buf & 0xf0) != 0x80) {
+      imcb_error(ic, "Unexpected websockets header [0x%x], exiting", buf);
+      imc_logout(ic, TRUE);
+      return FALSE;
+    }
+
+    if ((buf & 0x0f) == 8) {
+      b_event_remove(dd->keepalive_loop_id);
+      dd->keepalive_loop_id = 0;
+      dd->state = WS_CLOSING;
+      return FALSE;
+    }
+
+    if (ssl_read(dd->ssl, &buf, 1) < 1) {
+      imcb_error(ic, "Failed to read data.");
+      imc_logout(ic, TRUE);
+      return FALSE;
+    }
+    len = buf & 0x7f;
+    mask = (buf & 0x80) != 0;
+
+    if (len == 126) {
+      guint16 lbuf;
+      if (ssl_read(dd->ssl, (gchar*)&lbuf, 2) < 2) {
+        imcb_error(ic, "Failed to read data.");
+        imc_logout(ic, TRUE);
+        return FALSE;
+      }
+      len = GUINT16_FROM_BE(lbuf);
+    } else if (len == 127) {
+      guint64 lbuf;
+      if (ssl_read(dd->ssl, (gchar*)&lbuf, 8) < 8) {
+        imcb_error(ic, "Failed to read data.");
+        imc_logout(ic, TRUE);
+        return FALSE;
+      }
+      len = GUINT64_FROM_BE(lbuf);
+    }
+
+    if (mask) {
+      if (ssl_read(dd->ssl, (gchar*)&mkey, 4) < 4) {
+        imcb_error(ic, "Failed to read data.");
+        imc_logout(ic, TRUE);
+        return FALSE;
+      }
+    }
+
+    rdata = g_malloc0(len);
+    while (read < len) {
+      int ret = ssl_read(dd->ssl, rdata + read, len - read);
+      read += ret;
+      if (ret == 0) {
+        break;
+      }
+    }
+
+    if (mask) {
+      gchar *mdata = discord_ws_mask(mkey, rdata, len);
+      discord_parse_message(ic, mdata, len);
+      g_free(mdata);
+    } else {
+      discord_parse_message(ic, rdata, len);
+    }
+    g_free(rdata);
   }
-
   return TRUE;
 }
 
-static int
-discord_ws_callback(struct lws *wsi,
-                    enum lws_callback_reasons reason,
-                    void *user, void *in, size_t len)
+static gboolean discord_ws_connected_cb(gpointer data, int retcode,
+                                        void *source, b_input_condition cond)
 {
-  struct im_connection *ic = NULL;
-  discord_data *dd = NULL;
+  struct im_connection *ic = (struct im_connection *)data;
+  discord_data *dd = ic->proto_data;
+  guint32 tmp;
+  gchar *bkey;
+  GString *req;
+  guchar key[16];
 
-  if (wsi == NULL) {
-    return 0;
+  if (source == NULL) {
+    dd->ssl = NULL;
+    imcb_error(ic, "Failed to establish connection.");
+    imc_logout(ic, TRUE);
+    return FALSE;
   }
 
-  struct lws_context *wsctx = lws_get_context(wsi);
-  if (wsctx != NULL) {
-    ic = lws_context_user(wsctx);
-    dd = ic->proto_data;
-  }
+  tmp = g_random_int();
+  memcpy(key, &tmp, sizeof(tmp));
+  tmp = g_random_int();
+  memcpy(key + 4, &tmp, sizeof(tmp));
+  tmp = g_random_int();
+  memcpy(key + 8, &tmp, sizeof(tmp));
+  tmp = g_random_int();
+  memcpy(key + 12, &tmp, sizeof(tmp));
 
-  switch(reason) {
-    case LWS_CALLBACK_CLIENT_ESTABLISHED:
-      dd->state = WS_CONNECTED;
-      lws_callback_on_writable(wsi);
-      break;
-    case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
-      imcb_error(ic, "Websocket connection error");
-      if (in != NULL) {
-        imcb_error(ic, in);
-      }
-      b_event_remove(dd->keepalive_loop_id);
-      dd->keepalive_loop_id = 0;
-      dd->state = WS_CLOSING;
-      break;
-    case LWS_CALLBACK_CLIENT_WRITEABLE:
-      if (dd->state == WS_CONNECTED) {
-        GString *buf = g_string_new("");
-        g_string_printf(buf, "{\"d\":{\"v\":3,\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"}},\"op\":2}", dd->token);
-        discord_ws_send_payload(wsi, buf->str, buf->len);
-        g_string_free(buf, TRUE);
-      } else if (dd->state == WS_READY) {
-        GString *buf = g_string_new("");
+  bkey = g_base64_encode(key, 16);
 
-        g_string_printf(buf, "{\"op\":1,\"d\":%tu}", time(NULL));
-        discord_ws_send_payload(dd->lws, buf->str, buf->len);
-        g_string_free(buf, TRUE);
-      } else {
-        g_print("%s: Unhandled writable callback\n", __func__);
-      }
-      break;
-    case LWS_CALLBACK_CLIENT_RECEIVE:
-      {
-        size_t rpload = lws_remaining_packet_payload(wsi);
-        if (dd->ws_buf == NULL) {
-          dd->ws_buf = g_string_new("");
-        }
-        dd->ws_buf = g_string_append(dd->ws_buf, in);
-        if (rpload == 0) {
-          discord_parse_message(ic);
-          g_string_free(dd->ws_buf, TRUE);
-          dd->ws_buf = NULL;
-        }
-        break;
-      }
-    case LWS_CALLBACK_CLOSED:
-      b_event_remove(dd->keepalive_loop_id);
-      dd->keepalive_loop_id = 0;
-      dd->state = WS_CLOSING;
-      lws_cancel_service(dd->lwsctx);
-      break;
-    case LWS_CALLBACK_ADD_POLL_FD:
-      {
-        struct lws_pollargs *pargs = in;
-        dd->main_loop_id = b_input_add(pargs->fd, B_EV_IO_READ,
-                                       discord_ws_service_loop, ic);
-        break;
-      }
-    case LWS_CALLBACK_DEL_POLL_FD:
-      b_event_remove(dd->main_loop_id);
-      break;
-    case LWS_CALLBACK_CHANGE_MODE_POLL_FD:
-      {
-        struct lws_pollargs *pargs = in;
-        int flags = 0;
-        b_event_remove(dd->main_loop_id);
-        if (pargs->events & POLLIN) {
-          flags |= B_EV_IO_READ;
-        }
-        if (pargs->events & POLLOUT) {
-          flags |= B_EV_IO_WRITE;
-        }
-        dd->main_loop_id = b_input_add(pargs->fd, flags,
-                                       discord_ws_service_loop, ic);
-        break;
-      }
-    case LWS_CALLBACK_CLIENT_CONFIRM_EXTENSION_SUPPORTED:
-    case LWS_CALLBACK_GET_THREAD_ID:
-    case LWS_CALLBACK_LOCK_POLL:
-    case LWS_CALLBACK_UNLOCK_POLL:
-    case LWS_CALLBACK_OPENSSL_LOAD_EXTRA_CLIENT_VERIFY_CERTS:
-    case LWS_CALLBACK_PROTOCOL_INIT:
-    case LWS_CALLBACK_PROTOCOL_DESTROY:
-    case LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER:
-    case LWS_CALLBACK_CLIENT_FILTER_PRE_ESTABLISH:
-    case LWS_CALLBACK_WSI_CREATE:
-    case LWS_CALLBACK_WSI_DESTROY:
-      // Ignoring these, this block should be removed when defult is set to
-      // stay silent.
-      break;
-    default:
-      g_print("%s: unknown rsn=%d\n", __func__, reason);
-      break;
-  }
-  return 0;
+  req = g_string_new("");
+  g_string_printf(req, "GET %s HTTP/1.1\r\n"
+                       "Host: %s\r\n"
+                       "Connection: keep-alive, Upgrade\r\n"
+                       "Upgrade: websocket\r\n"
+                       "Origin: %s\r\n"
+                       "Pragma: no-cache\r\n"
+                       "Cache-Control: no-cache\r\n"
+                       "Sec-WebSocket-Version: 13\r\n"
+                       "Sec-WebSocket-Key: %s\r\n"
+                       "\r\n", dd->gateway->path, dd->gateway->addr,
+                       DISCORD_HOST, bkey);
+
+  g_free(bkey);
+
+  dd->sslfd = ssl_getfd(source);
+  dd->inpa = b_input_add(dd->sslfd, B_EV_IO_READ, discord_ws_in_cb, ic);
+  ssl_write(dd->ssl, req->str, req->len);
+  g_string_free(req, TRUE);
+  return FALSE;
 }
-
-static struct lws_protocols protocols[] =
-{
-  { "http-only,chat", discord_ws_callback, 0, 0, 0, NULL },
-  { NULL, NULL, 0, 0, 0, NULL } /* end */
-};
 
 int discord_ws_init(struct im_connection *ic, discord_data *dd)
 {
-  struct lws_context_creation_info info;
+  dd->ssl = ssl_connect(dd->gateway->addr, 443, TRUE,
+                        discord_ws_connected_cb, ic);
 
-  memset(&info, 0, sizeof(info));
-
-  info.port = CONTEXT_PORT_NO_LISTEN;
-  info.protocols = protocols;
-#ifndef LWS_NO_EXTENSIONS
-  info.extensions = lws_get_internal_extensions();
-#else
-  info.extensions = NULL;
-#endif
-  info.gid = -1;
-  info.uid = -1;
-  info.user = ic;
-
-  lws_set_log_level(0, NULL);
-
-  dd->lwsctx = lws_create_context(&info);
-  if (dd->lwsctx == NULL) {
+  if (dd->ssl == NULL) {
     return -1;
   }
 
-  dd->lws = lws_client_connect(dd->lwsctx, dd->gateway->addr,
-                                        dd->gateway->wss ? 443 : 80,
-                                        dd->gateway->wss,
-                                        dd->gateway->path, dd->gateway->addr,
-                                        "discordapp.com",
-                                        protocols[0].name, -1);
   return 0;
 }
 
@@ -220,8 +282,15 @@ void discord_ws_cleanup(discord_data *dd)
     b_event_remove(dd->keepalive_loop_id);
     dd->keepalive_loop_id = 0;
   }
-  if (dd->lwsctx != NULL) {
-    lws_context_destroy(dd->lwsctx);
+
+  if (dd->inpa > 0) {
+    b_event_remove(dd->inpa);
+    dd->inpa = 0;
+  }
+
+  if (dd->ssl != NULL) {
+    ssl_disconnect(dd->ssl);
+    dd->ssl = NULL;
   }
 }
 
@@ -241,7 +310,7 @@ void discord_ws_set_status(discord_data *dd, gboolean idle, gchar *message)
   } else {
     g_string_printf(buf, "{\"op\":3,\"d\":{\"idle_since\":null,\"game\":{\"name\":null}}}");
   }
-  discord_ws_send_payload(dd->lws, buf->str, buf->len);
+  discord_ws_send_payload(dd, buf->str, buf->len);
   g_string_free(buf, TRUE);
   g_free(msg);
 }
