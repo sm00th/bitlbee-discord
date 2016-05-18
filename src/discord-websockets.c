@@ -153,11 +153,8 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     }
 
     if ((buf & 0x0f) == 8) {
-      if (dd->keepalive_loop_id) {
-        b_event_remove(dd->keepalive_loop_id);
-        dd->keepalive_loop_id = 0;
-      }
-      dd->state = WS_CLOSING;
+      imcb_log(ic, "Remote host is closing websocket connection");
+      imc_logout(ic, TRUE);
       return FALSE;
     }
 
