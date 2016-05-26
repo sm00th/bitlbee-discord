@@ -146,8 +146,26 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
 
       dd->pchannels = g_slist_prepend(dd->pchannels, ci);
     } else if (g_strcmp0(type, "text") == 0) {
-      struct groupchat *gc = imcb_chat_new(ic, name);
-      imcb_chat_name_hint(gc, name);
+      gint plen = set_getint(&ic->acc->set, "server_prefix_len");
+      gchar *prefix = NULL;
+      gchar *fullname = NULL;
+      struct groupchat *gc = NULL;
+
+      if (plen == 0) {
+        fullname = g_strdup(name);
+      } else {
+        if (plen < 0) {
+          prefix = g_strdup(sinfo->name);
+        } else {
+          prefix = g_strndup(sinfo->name, plen);
+        }
+        fullname = g_strconcat(prefix, ".", name, NULL);
+      }
+      gc = imcb_chat_new(ic, name);
+      imcb_chat_name_hint(gc, fullname);
+
+      g_free(prefix);
+      g_free(fullname);
       if (topic != NULL && strlen(topic) > 0) {
         imcb_chat_topic(gc, "root", (char*)topic, 0);
       }
