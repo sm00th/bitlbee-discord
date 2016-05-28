@@ -87,7 +87,7 @@ This section describes options available throug "account set" bitlbee command
     will disable all acks from bitlbee-discord.
 
   - mention_suffix (type: string; default: ":")
-    Suffinx used in a regex to look for username mentions to automatically
+    Suffix used in a regex to look for username mentions to automatically
     convert your usual irc-style "nick:" mentions to discord's "<@id>" format.
     So if you type "nick: hello" in bitlbee, it will be displayed as
     "@nick hello" in discord. This can be multicharacter and you can even do OR
@@ -102,8 +102,8 @@ This section describes options available throug "account set" bitlbee command
     mentions.
 
   - incoming_me_translation (type: boolean; default: on)
-    This option controls wheter bitlbee-discord will translate incoming
-    messages that are fully italized(that is enclosed in '*' characters) to
+    This option controls whether bitlbee-discord will translate incoming
+    messages that are fully italicized (that is enclosed in '*' characters) to
     '/me' messages.
 
   - never_offline (type: boolean; default: off)

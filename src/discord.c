@@ -24,7 +24,7 @@ struct plugin_info *init_plugin_info(void)
 {
   static struct plugin_info info = {
     BITLBEE_ABI_VERSION_CODE,
-    "bitlbee-discrod",
+    "bitlbee-discord",
     "0.3.1",
     "Bitlbee plugin for discordapp.com",
     "Artem Savkov <artem.savkov@gmail.com>",
