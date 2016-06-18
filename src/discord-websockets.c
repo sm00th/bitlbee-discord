@@ -192,7 +192,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
       }
     }
 
-    rdata = g_malloc0(len);
+    rdata = g_malloc0(len + 1);
     while (read < len) {
       int ret = ssl_read(dd->ssl, rdata + read, len - read);
       read += ret;
