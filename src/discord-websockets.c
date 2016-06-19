@@ -22,13 +22,13 @@
 #include "discord-util.h"
 #include "discord.h"
 
-static gchar *discord_ws_mask(guint32 key, const char *pload,
+static gchar *discord_ws_mask(guchar key[4], const char *pload,
                               guint64 psize)
 {
   gchar *ret = g_malloc0(psize);
 
   for (guint64 i = 0; i < psize; i++) {
-    ret[i] = pload[i] ^ *((gchar*)&key + (i % 4));
+    ret[i] = pload[i] ^ key[i % 4];
   }
 
   return ret;
@@ -40,8 +40,11 @@ static int discord_ws_send_payload(discord_data *dd, const char *pload,
   gchar *buf;
   guint64 hlen = 6;
   size_t ret = 0;
-  guint32 mkey = g_random_int();
-  gchar *mpload = discord_ws_mask(mkey, pload, psize);
+  guchar mkey[4];
+  gchar *mpload;
+
+  random_bytes(mkey, sizeof(mkey));
+  mpload = discord_ws_mask(mkey, pload, psize);
 
   if (psize > 125) {
     if (psize > G_MAXUINT16) {
@@ -136,7 +139,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     gchar buf = 0 ;
     guint64 len = 0;
     gboolean mask = FALSE;
-    guint32 mkey = 0;
+    guchar mkey[4] = {0};
     gpointer rdata = NULL;
     guint64 read = 0;
 
@@ -185,14 +188,14 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     }
 
     if (mask) {
-      if (ssl_read(dd->ssl, (gchar*)&mkey, 4) < 4) {
+      if (ssl_read(dd->ssl, (gchar*)mkey, 4) < 4) {
         imcb_error(ic, "Failed to read data.");
         imc_logout(ic, TRUE);
         return FALSE;
       }
     }
 
-    rdata = g_malloc0(len);
+    rdata = g_malloc0(len + 1);
     while (read < len) {
       int ret = ssl_read(dd->ssl, rdata + read, len - read);
       read += ret;
@@ -218,7 +221,6 @@ static gboolean discord_ws_connected_cb(gpointer data, int retcode,
 {
   struct im_connection *ic = (struct im_connection *)data;
   discord_data *dd = ic->proto_data;
-  guint32 tmp;
   gchar *bkey;
   GString *req;
   guchar key[16];
@@ -230,14 +232,7 @@ static gboolean discord_ws_connected_cb(gpointer data, int retcode,
     return FALSE;
   }
 
-  tmp = g_random_int();
-  memcpy(key, &tmp, sizeof(tmp));
-  tmp = g_random_int();
-  memcpy(key + 4, &tmp, sizeof(tmp));
-  tmp = g_random_int();
-  memcpy(key + 8, &tmp, sizeof(tmp));
-  tmp = g_random_int();
-  memcpy(key + 12, &tmp, sizeof(tmp));
+  random_bytes(key, sizeof(key));
 
   bkey = g_base64_encode(key, 16);
 
