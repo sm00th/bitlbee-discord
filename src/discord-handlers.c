@@ -98,11 +98,13 @@ static void discord_handle_presence(struct im_connection *ic,
     channel_info *cinfo = cl->data;
 
     if (cinfo->type == CHANNEL_TEXT) {
-      if (flags) {
-        imcb_chat_add_buddy(cinfo->to.channel.gc, uinfo->user->handle);
-      } else {
-        imcb_chat_remove_buddy(cinfo->to.channel.gc, uinfo->user->handle,
-                               NULL);
+      if (cinfo->to.channel.gc != NULL) {
+        if (flags) {
+          imcb_chat_add_buddy(cinfo->to.channel.gc, uinfo->user->handle);
+        } else {
+          imcb_chat_remove_buddy(cinfo->to.channel.gc, uinfo->user->handle,
+                                 NULL);
+        }
       }
     }
   }
@@ -149,7 +151,6 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
       gint plen = set_getint(&ic->acc->set, "server_prefix_len");
       gchar *prefix = NULL;
       gchar *fullname = NULL;
-      struct groupchat *gc = NULL;
 
       if (plen == 0) {
         fullname = g_strdup(name);
@@ -161,34 +162,29 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
         }
         fullname = g_strconcat(prefix, ".", name, NULL);
       }
-      gc = imcb_chat_new(ic, name);
-      imcb_chat_name_hint(gc, fullname);
+
+      bee_chat_info_t *bci = g_new0(bee_chat_info_t, 1);
+      bci->title = g_strdup(fullname);
+      if (topic != NULL && strlen(topic) > 0) {
+        bci->topic = g_strdup(topic);
+      } else if (plen == 0) {
+        bci->topic = g_strdup_printf("%s/%s", sinfo->name, name);
+      }
+
+      ic->chatlist = g_slist_prepend(ic->chatlist, bci);
 
       g_free(prefix);
       g_free(fullname);
-      if (topic != NULL && strlen(topic) > 0) {
-        imcb_chat_topic(gc, "root", (char*)topic, 0);
-      }
-
-      for (GSList *ul = sinfo->users; ul; ul = g_slist_next(ul)) {
-        user_info *uinfo = ul->data;
-        if (uinfo->user->flags & BEE_USER_ONLINE) {
-          imcb_chat_add_buddy(gc, uinfo->user->handle);
-        }
-      }
-
-      imcb_chat_add_buddy(gc, dd->uname);
 
       channel_info *ci = g_new0(channel_info, 1);
       ci->type = CHANNEL_TEXT;
-      ci->to.channel.gc = gc;
+      ci->to.channel.name = g_strdup(name);
+      ci->to.channel.bci = bci;
       ci->to.channel.sinfo = sinfo;
       ci->id = g_strdup(id);
       if (lmid != NULL) {
         ci->last_msg = g_ascii_strtoull(lmid, NULL, 10);
       }
-
-      gc->data = ci;
 
       sinfo->channels = g_slist_prepend(sinfo->channels, ci);
     } else if (g_strcmp0(type, "voice") == 0) {
@@ -218,7 +214,7 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
       *clist = g_slist_remove(*clist, cdata);
       free_channel_info(cdata);
     } else if (action == ACTION_UPDATE) {
-      if (cdata->type == CHANNEL_TEXT) {
+      if (cdata->type == CHANNEL_TEXT && cdata->to.channel.gc != NULL) {
         if (g_strcmp0(topic, cdata->to.channel.gc->topic) != 0) {
           imcb_chat_topic(cdata->to.channel.gc, "root", (char*)topic, 0);
         }
@@ -362,7 +358,7 @@ static void discord_post_message(channel_info *cinfo, const gchar *author,
 
   if (cinfo->type == CHANNEL_PRIVATE) {
     imcb_buddy_msg(cinfo->to.handle.ic, author, msg, 0, 0);
-  } else if (cinfo->type == CHANNEL_TEXT) {
+  } else if (cinfo->type == CHANNEL_TEXT && cinfo->to.channel.gc != NULL) {
     imcb_chat_msg(cinfo->to.channel.gc, author, msg, 0, 0);
   }
 }
@@ -377,7 +373,7 @@ static gboolean discord_replace_channel(const GMatchInfo *match,
 
   channel_info *cinfo = get_channel(dd, chid, NULL, SEARCH_ID);
   if (cinfo != NULL && cinfo->type == CHANNEL_TEXT) {
-    gchar *r = g_strdup_printf("#%s", cinfo->to.channel.gc->title);
+    gchar *r = g_strdup_printf("#%s", cinfo->to.channel.name);
     result = g_string_append(result, r);
     g_free(r);
   } else {

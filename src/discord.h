@@ -74,6 +74,8 @@ typedef struct _channel_info {
   union {
     struct {
       struct groupchat     *gc;
+      char                 *name;
+      bee_chat_info_t      *bci;
       server_info          *sinfo;
     } channel;
     struct {
