@@ -95,6 +95,11 @@ static int discord_buddy_msg(struct im_connection *ic, char *to, char *msg,
 {
   discord_data *dd = ic->proto_data;
 
+  if (g_strcmp0(to, DISCORD_MFA_HANDLE) == 0) {
+    discord_http_mfa_auth(ic, msg);
+    return 0;
+  }
+
   for (GSList *cl = dd->pchannels; cl; cl = g_slist_next(cl)) {
     channel_info *cinfo = cl->data;
     if (cinfo->type == CHANNEL_PRIVATE &&

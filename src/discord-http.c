@@ -116,6 +116,32 @@ static void discord_http_gateway_cb(struct http_request *req)
   }
 }
 
+static void discord_http_mfa_cb(struct http_request *req)
+{
+  struct im_connection *ic = req->data;
+
+  json_value *js = json_parse(req->reply_body, req->body_size);
+  if (!js || js->type != json_object) {
+    imcb_error(ic, "Failed to parse json reply.");
+    imc_logout(ic, TRUE);
+    json_value_free(js);
+    return;
+  }
+
+  imcb_remove_buddy(ic, DISCORD_MFA_HANDLE, NULL);
+  if (req->status_code == 200) {
+    discord_data *dd = ic->proto_data;
+
+    g_free(dd->token);
+    dd->token = json_o_strdup(js, "token");
+    discord_http_get(ic, "gateway", discord_http_gateway_cb, ic);
+  } else {
+    imcb_error(ic, (char*)json_o_str(js, "message"));
+    imc_logout(ic, TRUE);
+  }
+  json_value_free(js);
+}
+
 static void discord_http_login_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
@@ -130,9 +156,18 @@ static void discord_http_login_cb(struct http_request *req)
 
   if (req->status_code == 200) {
     discord_data *dd = ic->proto_data;
-    dd->token = json_o_strdup(js, "token");
+    json_value *mfa = json_o_get(js, "mfa");
 
-    discord_http_get(ic, "gateway", discord_http_gateway_cb, ic);
+    if (mfa != NULL && mfa->type == json_boolean && mfa->u.boolean == TRUE) {
+      dd->token = json_o_strdup(js, "ticket");
+      imcb_log(ic, "Starting MFA authentication");
+      imcb_add_buddy(ic, DISCORD_MFA_HANDLE, NULL);
+      imcb_buddy_msg(ic, DISCORD_MFA_HANDLE, "Two-factor auth is enabled. "
+                     "Please respond to this message with your token.", 0, 0);
+    } else {
+      dd->token = json_o_strdup(js, "token");
+      discord_http_get(ic, "gateway", discord_http_gateway_cb, ic);
+    }
   } else {
     JSON_O_FOREACH(js, k, v){
       if (v->type != json_array) {
@@ -362,6 +397,34 @@ void discord_http_send_ack(struct im_connection *ic, const char *channel_id,
                                    request->str, discord_http_noop_cb,
                                    NULL);
 
+  g_string_free(request, TRUE);
+}
+
+void discord_http_mfa_auth(struct im_connection *ic, const char *msg)
+{
+  GString *request = g_string_new("");
+  GString *auth = g_string_new("");
+  discord_data *dd = ic->proto_data;
+
+  g_string_printf(auth, "{\"code\":\"%s\",\"ticket\":\"%s\"}",
+                  msg,
+                  dd->token);
+
+  g_string_printf(request, "POST /api/auth/mfa/totp HTTP/1.1\r\n"
+                  "Host: %s\r\n"
+                  "User-Agent: Bitlbee-Discord\r\n"
+                  "Content-Type: application/json\r\n"
+                  "Content-Length: %zd\r\n\r\n"
+                  "%s",
+                  set_getstr(&ic->acc->set, "host"),
+                  auth->len,
+                  auth->str);
+
+  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 80, 0,
+                                   request->str, discord_http_mfa_cb,
+                                   ic);
+
+  g_string_free(auth, TRUE);
   g_string_free(request, TRUE);
 }
 

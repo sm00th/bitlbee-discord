@@ -25,3 +25,4 @@ void discord_http_send_ack(struct im_connection *ic, const char *channel_id,
 void discord_http_get_backlog(struct im_connection *ic,
                               const char *channel_id);
 void discord_http_login(account_t *acc);
+void discord_http_mfa_auth(struct im_connection *ic, const char *msg);
