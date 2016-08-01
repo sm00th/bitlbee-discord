@@ -416,10 +416,11 @@ void discord_http_login(account_t *acc)
 {
   GString *request = g_string_new("");
   GString *jlogin = g_string_new("");
+  gchar *epass = discord_escape_string(acc->pass);
 
   g_string_printf(jlogin, "{\"email\":\"%s\",\"password\":\"%s\"}",
                   acc->user,
-                  acc->pass);
+                  epass);
 
   g_string_printf(request, "POST /api/auth/login HTTP/1.1\r\n"
                   "Host: %s\r\n"
@@ -435,6 +436,7 @@ void discord_http_login(account_t *acc)
                                    request->str, discord_http_login_cb,
                                    acc->ic);
 
+  g_free(epass);
   g_string_free(jlogin, TRUE);
   g_string_free(request, TRUE);
 }
