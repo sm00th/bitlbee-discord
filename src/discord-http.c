@@ -48,7 +48,7 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
                   set_getstr(&ic->acc->set, "host"),
                   dd->token);
 
-  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 80, 0,
+  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                         request->str, cb_func, data);
   g_string_free(request, TRUE);
 }
@@ -351,7 +351,7 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
                   content->len,
                   content->str);
 
-  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 80, 0,
+  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_send_msg_cb, ic);
 
   g_string_free(content, TRUE);
@@ -377,7 +377,7 @@ void discord_http_send_ack(struct im_connection *ic, const char *channel_id,
                   set_getstr(&ic->acc->set, "host"),
                   dd->token);
 
-  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 80, 0,
+  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_noop_cb,
                                    NULL);
 
@@ -404,7 +404,7 @@ void discord_http_mfa_auth(struct im_connection *ic, const char *msg)
                   auth->len,
                   auth->str);
 
-  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 80, 0,
+  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_mfa_cb,
                                    ic);
 
@@ -432,7 +432,7 @@ void discord_http_login(account_t *acc)
                   jlogin->len,
                   jlogin->str);
 
-  (void) http_dorequest(set_getstr(&acc->set, "host"), 80, 0,
+  (void) http_dorequest(set_getstr(&acc->set, "host"), 443, 1,
                                    request->str, discord_http_login_cb,
                                    acc->ic);
 
@@ -500,7 +500,7 @@ void discord_http_create_and_send_msg(struct im_connection *ic,
   casm_data *cd = g_new0(casm_data, 1);
   cd->ic = ic;
   cd->msg = g_strdup(msg);
-  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 80, 0,
+  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_casm_cb, cd);
 
   g_string_free(content, TRUE);
