@@ -116,6 +116,15 @@ static void discord_http_gateway_cb(struct http_request *req)
   }
 }
 
+void discord_http_get_gateway(struct im_connection *ic, const char *token)
+{
+  discord_data *dd = ic->proto_data;
+
+  dd->token = g_strdup(token);
+  set_setstr(&ic->acc->set, "token_cache", dd->token);
+  discord_http_get(ic, "gateway", discord_http_gateway_cb, ic);
+}
+
 static void discord_http_mfa_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
@@ -133,8 +142,7 @@ static void discord_http_mfa_cb(struct http_request *req)
     discord_data *dd = ic->proto_data;
 
     g_free(dd->token);
-    dd->token = json_o_strdup(js, "token");
-    discord_http_get(ic, "gateway", discord_http_gateway_cb, ic);
+    discord_http_get_gateway(ic, json_o_str(js, "token"));
   } else {
     imcb_error(ic, (char*)json_o_str(js, "message"));
     imc_logout(ic, TRUE);
@@ -165,8 +173,7 @@ static void discord_http_login_cb(struct http_request *req)
       imcb_buddy_msg(ic, DISCORD_MFA_HANDLE, "Two-factor auth is enabled. "
                      "Please respond to this message with your token.", 0, 0);
     } else {
-      dd->token = json_o_strdup(js, "token");
-      discord_http_get(ic, "gateway", discord_http_gateway_cb, ic);
+      discord_http_get_gateway(ic, json_o_str(js, "token"));
     }
   } else {
     imcb_error(ic, (char*)json_o_str(js, "message"));

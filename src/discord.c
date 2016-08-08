@@ -59,6 +59,9 @@ static void discord_init(account_t *acc)
   s = set_add(&acc->set, "server_prefix_len", "0", set_eval_int, acc);
   s->flags |= ACC_SET_OFFLINE_ONLY;
 
+  s = set_add(&acc->set, "token_cache", NULL, NULL, acc);
+  s->flags |= SET_HIDDEN | SET_NULL_OK;
+
   acc->flags |= ACC_FLAG_AWAY_MESSAGE;
   acc->flags |= ACC_FLAG_STATUS_MESSAGE;
 }
@@ -71,7 +74,11 @@ static void discord_login(account_t *acc)
   dd->keepalive_interval = DEFAULT_KEEPALIVE_INTERVAL;
   ic->proto_data = dd;
 
-  discord_http_login(acc);
+  if (set_getstr(&ic->acc->set,"token_cache")) {
+    discord_http_get_gateway(ic, set_getstr(&ic->acc->set,"token_cache"));
+  } else {
+    discord_http_login(acc);
+  }
 }
 
 static void discord_logout(struct im_connection *ic)

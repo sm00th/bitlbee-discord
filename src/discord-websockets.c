@@ -157,6 +157,10 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
 
     if ((buf & 0x0f) == 8) {
       imcb_log(ic, "Remote host is closing websocket connection");
+      if (dd->state == WS_CONNECTED) {
+        imcb_log(ic, "Token expired, cleaning up");
+        set_setstr(&ic->acc->set, "token_cache", NULL);
+      }
       imc_logout(ic, TRUE);
       return FALSE;
     }
