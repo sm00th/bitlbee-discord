@@ -269,15 +269,14 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
   } else if (action == ACTION_DELETE) {
     user_info *udata = get_user(dd, id, server_id, SEARCH_ID);
 
-    if (udata == NULL) {
-      return;
-    }
-    sinfo->users = g_slist_remove(sinfo->users, udata);
-    free_user_info(udata);
+    if (udata != NULL) {
+      sinfo->users = g_slist_remove(sinfo->users, udata);
+      free_user_info(udata);
 
-    udata = get_user(dd, name, NULL, SEARCH_NAME);
-    if (udata == NULL) {
-      imcb_remove_buddy(ic, name, NULL);
+      udata = get_user(dd, name, NULL, SEARCH_NAME);
+      if (udata == NULL) {
+        imcb_remove_buddy(ic, name, NULL);
+      }
     }
   }
 
