@@ -252,8 +252,8 @@ char *discord_escape_string(const char *msg)
   emsg = nmsg;
 
   g_regex_unref(escregex);
-  escregex = g_regex_new("[\r\n]", 0, 0, NULL);
-  nmsg = g_regex_replace_literal(escregex, emsg, -1, 0, "", 0, NULL);
+  escregex = g_regex_new("[\r\n]+", 0, 0, NULL);
+  nmsg = g_regex_replace_literal(escregex, emsg, -1, 0, " ", 0, NULL);
 
   g_free(emsg);
   emsg = nmsg;
