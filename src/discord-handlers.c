@@ -482,6 +482,7 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
         discord_http_send_ack(ic, cinfo->id, json_o_str(minfo, "id"));
       }
       cinfo->last_msg = msgid;
+      cinfo->last_read = msgid;
     }
   } else if (action == ACTION_UPDATE) {
     if (json_o_str(json_o_get(minfo, "author"), "username") != NULL) {
@@ -588,12 +589,8 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
               lm = g_ascii_strtoull(lmsg, NULL, 10);
             }
             channel_info *cinfo = get_channel(dd, channel_id, NULL, SEARCH_ID);
-            if (cinfo != NULL && cinfo->last_msg > lm) {
-              char *rlmsg = g_strdup_printf("%lu", cinfo->last_msg);
-              cinfo->last_msg = lm;
-              discord_http_get_backlog(ic, channel_id);
-              discord_http_send_ack(ic, cinfo->id, rlmsg);
-              g_free(rlmsg);
+            if (cinfo != NULL) {
+              cinfo->last_read = lm;
             }
           }
         }

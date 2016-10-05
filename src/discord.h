@@ -71,6 +71,7 @@ typedef struct _server_info {
 typedef struct _channel_info {
   char                 *id;
   guint64              last_msg;
+  guint64              last_read;
   union {
     struct {
       struct groupchat     *gc;
