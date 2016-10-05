@@ -378,8 +378,10 @@ void discord_http_send_ack(struct im_connection *ic, const char *channel_id,
   g_string_printf(request, "POST /api/channels/%s/messages/%s/ack HTTP/1.1\r\n"
                   "Host: %s\r\n"
                   "User-Agent: Bitlbee-Discord\r\n"
+                  "Content-Type: application/json\r\n"
                   "Authorization: %s\r\n"
-                  "Content-Length: 0\r\n\r\n",
+                  "Content-Length: 2\r\n\r\n"
+                  "{}",
                   channel_id, message_id,
                   set_getstr(&ic->acc->set, "host"),
                   dd->token);
