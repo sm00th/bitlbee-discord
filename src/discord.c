@@ -100,7 +100,7 @@ static void discord_chat_msg(struct groupchat *gc, char *msg, int flags)
 
 static void discord_chat_list(struct im_connection *ic, const char *server)
 {
-  bee_chat_list_finish(ic);
+  imcb_chat_list_finish(ic);
 }
 
 static struct groupchat *discord_chat_join(struct im_connection *ic,
