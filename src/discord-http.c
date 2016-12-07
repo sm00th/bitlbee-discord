@@ -239,9 +239,9 @@ static gboolean discord_mentions_string(const GMatchInfo *match,
   discord_data *dd = ic->proto_data;
   gchar *name = g_match_info_fetch(match, 1);
 
-  search_t stype = SEARCH_NAME;
+  search_t stype = SEARCH_IRC_USER_NAME;
   if (set_getbool(&ic->acc->set, "mention_ignorecase") == TRUE) {
-    stype = SEARCH_NAME_IGNORECASE;
+    stype = SEARCH_IRC_USER_NAME_IGNORECASE;
   }
 
   user_info *uinfo = get_user(dd, name, md->sid, stype);
@@ -481,7 +481,7 @@ void discord_http_create_and_send_msg(struct im_connection *ic,
                                       const char *handle, const char *msg)
 {
   discord_data *dd = ic->proto_data;
-  user_info *uinfo = get_user(dd, handle, NULL, SEARCH_NAME);
+  user_info *uinfo = get_user(dd, handle, NULL, SEARCH_IRC_USER_NAME);
 
   if (uinfo == NULL) {
     imcb_error(ic, "Failed to create channel for unknown user: '%s'.",
