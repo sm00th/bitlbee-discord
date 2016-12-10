@@ -58,6 +58,7 @@ typedef struct _discord_data {
   void     *ssl;
   int      sslfd;
   int      inpa;
+  guint64  seq;
 } discord_data;
 
 typedef struct _server_info {

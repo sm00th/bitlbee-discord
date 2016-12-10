@@ -90,7 +90,11 @@ static gboolean discord_ws_writable(gpointer data, int source,
   } else if (dd->state == WS_READY) {
     GString *buf = g_string_new("");
 
-    g_string_printf(buf, "{\"op\":1,\"d\":%tu}", time(NULL));
+    if (dd->seq == 0) {
+      g_string_printf(buf, "{\"op\":1,\"d\":null}");
+    } else {
+      g_string_printf(buf, "{\"op\":1,\"d\":%lu}", dd->seq);
+    }
     discord_ws_send_payload(dd, buf->str, buf->len);
     g_string_free(buf, TRUE);
   } else {

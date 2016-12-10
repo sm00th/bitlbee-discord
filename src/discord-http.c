@@ -95,7 +95,7 @@ static void discord_http_gateway_cb(struct http_request *req)
     dd->gateway->path = g_match_info_fetch(match, 3);
 
     if (dd->gateway->path == NULL) {
-      dd->gateway->path = g_strdup("/");
+      dd->gateway->path = g_strdup("/?encoding=json&v=6");
     }
 
     g_match_info_free(match);
