@@ -527,6 +527,7 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
 {
   discord_data *dd = ic->proto_data;
   json_value *js = json_parse(buf, size);
+
   if (!js || js->type != json_object) {
     imcb_error(ic, "Failed to parse json reply.");
     imc_logout(ic, TRUE);
@@ -534,7 +535,28 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
   }
 
   const char *event = json_o_str(js, "t");
-  if (g_strcmp0(event, "READY") == 0) {
+  gint op = 0;
+  json_value *jsop = json_o_get(js, "op");
+  if (jsop != NULL && jsop->type == json_integer) {
+    op = jsop->u.integer;
+  }
+  json_value *seq = json_o_get(js, "s");
+  if (seq != NULL && seq->type == json_integer) {
+    dd->seq = seq->u.integer;
+  }
+
+  if (op == 10) {
+    json_value *data = json_o_get(js, "d");
+    json_value *hbeat = json_o_get(data, "heartbeat_interval");
+    if (hbeat != NULL && hbeat->type == json_integer) {
+      dd->keepalive_interval = hbeat->u.integer;
+      if (dd->keepalive_interval == 0) {
+        dd->keepalive_interval = DEFAULT_KEEPALIVE_INTERVAL;
+      }
+    }
+  } else if (op == 11) {
+    // heartbeat ack
+  } else if (g_strcmp0(event, "READY") == 0) {
     dd->state = WS_READY;
     json_value *data = json_o_get(js, "d");
 
