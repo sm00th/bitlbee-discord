@@ -78,13 +78,24 @@ static int discord_ws_send_payload(discord_data *dd, const char *pload,
   g_free(buf);
   return ret;
 }
+
+void discord_ws_sync_server(discord_data *dd, const char *id)
+{
+  GString *buf = g_string_new("");
+  g_string_printf(buf, "{\"op\":12,\"d\":[\"%s\"]}", id);
+  discord_ws_send_payload(dd, buf->str, buf->len);
+  g_string_free(buf, TRUE);
+  g_main_context_iteration(NULL, TRUE);
+}
+
 static gboolean discord_ws_writable(gpointer data, int source,
                                     b_input_condition cond)
 {
   discord_data *dd = (discord_data*)data;
   if (dd->state == WS_CONNECTED) {
     GString *buf = g_string_new("");
-    g_string_printf(buf, "{\"d\":{\"v\":3,\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"}},\"op\":2}", dd->token);
+    g_string_printf(buf, "{\"d\":{\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"},\"compress\":false,\"large_threshold\":250,\"synced_guilds\":[]},\"op\":2}", dd->token);
+
     discord_ws_send_payload(dd, buf->str, buf->len);
     g_string_free(buf, TRUE);
   } else if (dd->state == WS_READY) {
