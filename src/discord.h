@@ -27,14 +27,16 @@ typedef enum {
   WS_IDLE,
   WS_CONNECTING,
   WS_CONNECTED,
+  WS_ALMOST_READY,
   WS_READY,
   WS_CLOSING,
 } ws_state;
 
 typedef enum {
   CHANNEL_TEXT,
+  CHANNEL_PRIVATE,
   CHANNEL_VOICE,
-  CHANNEL_PRIVATE
+  CHANNEL_GROUP_PRIVATE
 } channel_type;
 
 typedef struct _gw_data {
@@ -59,6 +61,7 @@ typedef struct _discord_data {
   int      sslfd;
   int      inpa;
   guint64  seq;
+  guint    pending_sync;
 } discord_data;
 
 typedef struct _server_info {
