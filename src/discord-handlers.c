@@ -576,7 +576,7 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
     dd->seq = seq->u.integer;
   }
 
-  if (op == 10) {
+  if (op == OPCODE_HELLO) {
     json_value *data = json_o_get(js, "d");
     json_value *hbeat = json_o_get(data, "heartbeat_interval");
     if (hbeat != NULL && hbeat->type == json_integer) {
@@ -588,7 +588,7 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
 
     dd->keepalive_loop_id = b_timeout_add(dd->keepalive_interval,
                                           discord_ws_keepalive_loop, ic);
-  } else if (op == 11) {
+  } else if (op == OPCODE_HEARTBEAT_ACK) {
     // heartbeat ack
   } else if (g_strcmp0(event, "READY") == 0) {
     dd->state = WS_ALMOST_READY;
