@@ -670,9 +670,8 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
     dd->pending_sync--;
     if (dd->pending_sync < 1 && dd->state == WS_ALMOST_READY) {
       dd->state = WS_READY;
+      imcb_connected(ic);
     }
-
-    imcb_connected(ic);
   } else if (g_strcmp0(event, "VOICE_STATE_UPDATE") == 0) {
     json_value *vsinfo = json_o_get(js, "d");
     discord_handle_voice_state(ic, vsinfo, json_o_str(vsinfo, "guild_id"));
