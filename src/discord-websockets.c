@@ -85,7 +85,6 @@ void discord_ws_sync_server(discord_data *dd, const char *id)
   g_string_printf(buf, "{\"op\":%d,\"d\":[\"%s\"]}", OPCODE_REQUEST_SYNC, id);
   discord_ws_send_payload(dd, buf->str, buf->len);
   g_string_free(buf, TRUE);
-  g_main_context_iteration(NULL, TRUE);
 }
 
 static gboolean discord_ws_writable(gpointer data, int source,
