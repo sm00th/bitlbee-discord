@@ -112,6 +112,64 @@ static void discord_handle_presence(struct im_connection *ic,
   imcb_buddy_status(ic, uinfo->name, flags, NULL, NULL);
 }
 
+static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
+                                const char *server_id,
+                                handler_action action)
+{
+  discord_data *dd = ic->proto_data;
+  server_info *sinfo = get_server_by_id(dd, server_id);
+
+  if (sinfo == NULL) {
+    return;
+  }
+
+  const char *id   = json_o_str(uinfo, "id");
+  char *name = discord_canonize_name(json_o_str(uinfo, "username"));
+
+  if (action == ACTION_CREATE) {
+    if (name) {
+      user_info *ui = NULL;
+      bee_user_t *bu = bee_user_by_handle(ic->bee, ic, name);
+
+      if (bu == NULL) {
+        imcb_add_buddy(ic, name, NULL);
+        if (set_getbool(&ic->acc->set, "never_offline") == TRUE) {
+          imcb_buddy_status(ic, name, BEE_USER_ONLINE | BEE_USER_AWAY, NULL,
+                            NULL);
+        } else {
+          imcb_buddy_status(ic, name, 0, NULL, NULL);
+        }
+        bu = bee_user_by_handle(ic->bee, ic, name);
+      }
+
+      if (bu != NULL) {
+        ui = g_new0(user_info, 1);
+        ui->user = bu;
+        ui->id = g_strdup(id);
+        ui->name = g_strdup(name);
+
+        sinfo->users = g_slist_prepend(sinfo->users, ui);
+      }
+    }
+  } else if (action == ACTION_DELETE) {
+    user_info *udata = get_user(dd, id, server_id, SEARCH_ID);
+
+    if (udata != NULL) {
+      sinfo->users = g_slist_remove(sinfo->users, udata);
+      free_user_info(udata);
+
+      udata = get_user(dd, name, NULL, SEARCH_NAME);
+      if (udata == NULL) {
+        imcb_remove_buddy(ic, name, NULL);
+      }
+    }
+  }
+
+  g_free(name);
+  // XXX: Should warn about unhandled action _UPDATE if we switch to some
+  // centralized handling solution.
+}
+
 void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
                             const char *server_id, handler_action action)
 {
@@ -154,6 +212,7 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
           ci->to.handle.ic = ic;
 
           dd->pchannels = g_slist_prepend(dd->pchannels, ci);
+          discord_handle_user(ic, rcp, sinfo ? sinfo->id : NULL, ACTION_CREATE);
         } else {
           g_print("Failed to recepient for private channel.\n");
           free_channel_info(ci);
@@ -245,64 +304,6 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
       }
     }
   }
-}
-
-static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
-                                const char *server_id,
-                                handler_action action)
-{
-  discord_data *dd = ic->proto_data;
-  server_info *sinfo = get_server_by_id(dd, server_id);
-
-  if (sinfo == NULL) {
-    return;
-  }
-
-  const char *id   = json_o_str(uinfo, "id");
-  char *name = discord_canonize_name(json_o_str(uinfo, "username"));
-
-  if (action == ACTION_CREATE) {
-    if (name) {
-      user_info *ui = NULL;
-      bee_user_t *bu = bee_user_by_handle(ic->bee, ic, name);
-
-      if (bu == NULL) {
-        imcb_add_buddy(ic, name, NULL);
-        if (set_getbool(&ic->acc->set, "never_offline") == TRUE) {
-          imcb_buddy_status(ic, name, BEE_USER_ONLINE | BEE_USER_AWAY, NULL,
-                            NULL);
-        } else {
-          imcb_buddy_status(ic, name, 0, NULL, NULL);
-        }
-        bu = bee_user_by_handle(ic->bee, ic, name);
-      }
-
-      if (bu != NULL) {
-        ui = g_new0(user_info, 1);
-        ui->user = bu;
-        ui->id = g_strdup(id);
-        ui->name = g_strdup(name);
-
-        sinfo->users = g_slist_prepend(sinfo->users, ui);
-      }
-    }
-  } else if (action == ACTION_DELETE) {
-    user_info *udata = get_user(dd, id, server_id, SEARCH_ID);
-
-    if (udata != NULL) {
-      sinfo->users = g_slist_remove(sinfo->users, udata);
-      free_user_info(udata);
-
-      udata = get_user(dd, name, NULL, SEARCH_NAME);
-      if (udata == NULL) {
-        imcb_remove_buddy(ic, name, NULL);
-      }
-    }
-  }
-
-  g_free(name);
-  // XXX: Should warn about unhandled action _UPDATE if we switch to some
-  // centralized handling solution.
 }
 
 static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
