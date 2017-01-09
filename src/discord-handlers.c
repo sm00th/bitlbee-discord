@@ -98,157 +98,18 @@ static void discord_handle_presence(struct im_connection *ic,
     channel_info *cinfo = cl->data;
 
     if (cinfo->type == CHANNEL_TEXT) {
-      if (flags) {
-        imcb_chat_add_buddy(cinfo->to.channel.gc, uinfo->user->handle);
-      } else {
-        imcb_chat_remove_buddy(cinfo->to.channel.gc, uinfo->user->handle,
-                               NULL);
+      if (cinfo->to.channel.gc != NULL) {
+        if (flags) {
+          imcb_chat_add_buddy(cinfo->to.channel.gc, uinfo->user->handle);
+        } else {
+          imcb_chat_remove_buddy(cinfo->to.channel.gc, uinfo->user->handle,
+                                 NULL);
+        }
       }
     }
   }
 
   imcb_buddy_status(ic, uinfo->name, flags, NULL, NULL);
-}
-
-void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
-                            const char *server_id, handler_action action)
-{
-  discord_data *dd = ic->proto_data;
-  server_info *sinfo = get_server_by_id(dd, server_id);
-
-  const char *id    = json_o_str(cinfo, "id");
-  const char *name  = json_o_str(cinfo, "name");
-  const char *lmid  = json_o_str(cinfo, "last_message_id");
-  const char *topic = json_o_str(cinfo, "topic");
-  json_value *tjs = NULL;
-  channel_type ctype = 0;
-
-  tjs = json_o_get(cinfo, "type");
-  if (tjs != NULL && tjs->type == json_integer) {
-    ctype = tjs->u.integer;
-  }
-
-  if (ctype != CHANNEL_PRIVATE && ctype != CHANNEL_GROUP_PRIVATE
-      && sinfo == NULL) {
-    return;
-  }
-
-  if (action == ACTION_CREATE) {
-    switch(ctype) {
-      case CHANNEL_PRIVATE:
-      {
-        channel_info *ci = g_new0(channel_info, 1);
-        ci->type = ctype;
-        if (lmid != NULL) {
-          ci->last_msg = g_ascii_strtoull(lmid, NULL, 10);
-        }
-
-        json_value *rcplist = json_o_get(cinfo, "recipients");
-        if (rcplist != NULL && rcplist->type == json_array) {
-          json_value *rcp = rcplist->u.array.values[0];
-
-          ci->to.handle.name = discord_canonize_name(json_o_str(rcp, "username"));
-          ci->id = json_o_strdup(cinfo, "id");
-          ci->to.handle.ic = ic;
-
-          dd->pchannels = g_slist_prepend(dd->pchannels, ci);
-        } else {
-          g_print("Failed to recepient for private channel.\n");
-          free_channel_info(ci);
-        }
-        break;
-      }
-      case CHANNEL_TEXT:
-      {
-        gint plen = set_getint(&ic->acc->set, "server_prefix_len");
-        gchar *prefix = NULL;
-        gchar *fullname = NULL;
-        struct groupchat *gc = NULL;
-
-        if (plen == 0) {
-          fullname = g_strdup(name);
-        } else {
-          if (plen < 0) {
-            prefix = g_strdup(sinfo->name);
-          } else {
-            prefix = g_strndup(sinfo->name, plen);
-          }
-          fullname = g_strconcat(prefix, ".", name, NULL);
-        }
-        gc = imcb_chat_new(ic, name);
-        imcb_chat_name_hint(gc, fullname);
-
-        g_free(prefix);
-        g_free(fullname);
-        if (topic != NULL && strlen(topic) > 0) {
-          imcb_chat_topic(gc, "root", (char*)topic, 0);
-        }
-
-        for (GSList *ul = sinfo->users; ul; ul = g_slist_next(ul)) {
-          user_info *uinfo = ul->data;
-          if (uinfo->user->flags & BEE_USER_ONLINE) {
-            imcb_chat_add_buddy(gc, uinfo->user->handle);
-          }
-        }
-
-        imcb_chat_add_buddy(gc, dd->uname);
-
-        channel_info *ci = g_new0(channel_info, 1);
-        ci->type = ctype;
-        ci->to.channel.gc = gc;
-        ci->to.channel.sinfo = sinfo;
-        ci->id = g_strdup(id);
-        if (lmid != NULL) {
-          ci->last_msg = g_ascii_strtoull(lmid, NULL, 10);
-        }
-
-        gc->data = ci;
-
-        sinfo->channels = g_slist_prepend(sinfo->channels, ci);
-        break;
-      }
-      case CHANNEL_GROUP_PRIVATE:
-      {
-        // TODO: Implement group pms
-        break;
-      }
-      case CHANNEL_VOICE:
-      {
-        channel_info *ci = g_new0(channel_info, 1);
-        ci->type = CHANNEL_VOICE;
-        ci->last_msg = 0;
-        ci->to.handle.name = g_strdup(name);
-        ci->id = g_strdup(id);
-        ci->to.handle.ic = ic;
-
-        sinfo->channels = g_slist_prepend(sinfo->channels, ci);
-        break;
-      }
-    }
-  } else {
-    channel_info *cdata = get_channel(dd, id, server_id, SEARCH_ID);
-    if (cdata == NULL) {
-      return;
-    }
-
-    if (action == ACTION_DELETE) {
-      GSList **clist;
-      if (cdata->type == CHANNEL_PRIVATE) {
-        clist = &dd->pchannels;
-      } else {
-        clist = &sinfo->channels;
-      }
-
-      *clist = g_slist_remove(*clist, cdata);
-      free_channel_info(cdata);
-    } else if (action == ACTION_UPDATE) {
-      if (cdata->type == CHANNEL_TEXT) {
-        if (g_strcmp0(topic, cdata->to.channel.gc->topic) != 0) {
-          imcb_chat_topic(cdata->to.channel.gc, "root", (char*)topic, 0);
-        }
-      }
-    }
-  }
 }
 
 static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
@@ -307,6 +168,142 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
   g_free(name);
   // XXX: Should warn about unhandled action _UPDATE if we switch to some
   // centralized handling solution.
+}
+
+void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
+                            const char *server_id, handler_action action)
+{
+  discord_data *dd = ic->proto_data;
+  server_info *sinfo = get_server_by_id(dd, server_id);
+
+  const char *id    = json_o_str(cinfo, "id");
+  const char *name  = json_o_str(cinfo, "name");
+  const char *lmid  = json_o_str(cinfo, "last_message_id");
+  const char *topic = json_o_str(cinfo, "topic");
+  json_value *tjs = NULL;
+  channel_type ctype = 0;
+
+  tjs = json_o_get(cinfo, "type");
+  if (tjs != NULL && tjs->type == json_integer) {
+    ctype = tjs->u.integer;
+  }
+
+  if (ctype != CHANNEL_PRIVATE && ctype != CHANNEL_GROUP_PRIVATE
+      && sinfo == NULL) {
+    return;
+  }
+
+  if (action == ACTION_CREATE) {
+    switch(ctype) {
+      case CHANNEL_PRIVATE:
+      {
+        channel_info *ci = g_new0(channel_info, 1);
+        ci->type = ctype;
+        if (lmid != NULL) {
+          ci->last_msg = g_ascii_strtoull(lmid, NULL, 10);
+        }
+
+        json_value *rcplist = json_o_get(cinfo, "recipients");
+        if (rcplist != NULL && rcplist->type == json_array) {
+          json_value *rcp = rcplist->u.array.values[0];
+
+          ci->to.handle.name = discord_canonize_name(json_o_str(rcp, "username"));
+          ci->id = json_o_strdup(cinfo, "id");
+          ci->to.handle.ic = ic;
+
+          dd->pchannels = g_slist_prepend(dd->pchannels, ci);
+          discord_handle_user(ic, rcp, sinfo ? sinfo->id : NULL, ACTION_CREATE);
+        } else {
+          g_print("Failed to recepient for private channel.\n");
+          free_channel_info(ci);
+        }
+        break;
+      }
+      case CHANNEL_TEXT:
+      {
+        gint plen = set_getint(&ic->acc->set, "server_prefix_len");
+        gchar *prefix = NULL;
+        gchar *fullname = NULL;
+
+        if (plen == 0) {
+          fullname = g_strdup(name);
+        } else {
+          if (plen < 0) {
+            prefix = g_strdup(sinfo->name);
+          } else {
+            prefix = g_strndup(sinfo->name, plen);
+          }
+          fullname = g_strconcat(prefix, ".", name, NULL);
+        }
+
+        bee_chat_info_t *bci = g_new0(bee_chat_info_t, 1);
+        bci->title = g_strdup(fullname);
+        if (topic != NULL && strlen(topic) > 0) {
+          bci->topic = g_strdup(topic);
+        } else if (plen == 0) {
+          bci->topic = g_strdup_printf("%s/%s", sinfo->name, name);
+        }
+
+        ic->chatlist = g_slist_prepend(ic->chatlist, bci);
+
+        g_free(prefix);
+        g_free(fullname);
+
+        channel_info *ci = g_new0(channel_info, 1);
+        ci->type = ctype;
+        ci->to.channel.name = g_strdup(name);
+        ci->to.channel.bci = bci;
+        ci->to.channel.sinfo = sinfo;
+        ci->id = g_strdup(id);
+        if (lmid != NULL) {
+          ci->last_msg = g_ascii_strtoull(lmid, NULL, 10);
+        }
+
+        sinfo->channels = g_slist_prepend(sinfo->channels, ci);
+        break;
+      }
+      case CHANNEL_GROUP_PRIVATE:
+      {
+        // TODO: Implement group pms
+        break;
+      }
+      case CHANNEL_VOICE:
+      {
+        channel_info *ci = g_new0(channel_info, 1);
+        ci->type = CHANNEL_VOICE;
+        ci->last_msg = 0;
+        ci->to.handle.name = g_strdup(name);
+        ci->id = g_strdup(id);
+        ci->to.handle.ic = ic;
+
+        sinfo->channels = g_slist_prepend(sinfo->channels, ci);
+        break;
+      }
+    }
+  } else {
+    channel_info *cdata = get_channel(dd, id, server_id, SEARCH_ID);
+    if (cdata == NULL) {
+      return;
+    }
+
+    if (action == ACTION_DELETE) {
+      GSList **clist;
+      if (cdata->type == CHANNEL_PRIVATE) {
+        clist = &dd->pchannels;
+      } else {
+        clist = &sinfo->channels;
+      }
+
+      *clist = g_slist_remove(*clist, cdata);
+      free_channel_info(cdata);
+    } else if (action == ACTION_UPDATE) {
+      if (cdata->type == CHANNEL_TEXT && cdata->to.channel.gc != NULL) {
+        if (g_strcmp0(topic, cdata->to.channel.gc->topic) != 0) {
+          imcb_chat_topic(cdata->to.channel.gc, "root", (char*)topic, 0);
+        }
+      }
+    }
+  }
 }
 
 static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
@@ -380,18 +377,21 @@ static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
   }
 }
 
-static void discord_post_message(channel_info *cinfo, const gchar *author,
+static gboolean discord_post_message(channel_info *cinfo, const gchar *author,
                                  gchar *msg)
 {
   if (strlen(msg) == 0) {
-    return;
+    return FALSE;
   }
 
   if (cinfo->type == CHANNEL_PRIVATE) {
     imcb_buddy_msg(cinfo->to.handle.ic, author, msg, 0, 0);
-  } else if (cinfo->type == CHANNEL_TEXT) {
+    return TRUE;
+  } else if (cinfo->type == CHANNEL_TEXT && cinfo->to.channel.gc != NULL) {
     imcb_chat_msg(cinfo->to.channel.gc, author, msg, 0, 0);
+    return TRUE;
   }
+  return FALSE;
 }
 
 static gboolean discord_replace_channel(const GMatchInfo *match,
@@ -404,7 +404,7 @@ static gboolean discord_replace_channel(const GMatchInfo *match,
 
   channel_info *cinfo = get_channel(dd, chid, NULL, SEARCH_ID);
   if (cinfo != NULL && cinfo->type == CHANNEL_TEXT) {
-    gchar *r = g_strdup_printf("#%s", cinfo->to.channel.gc->title);
+    gchar *r = g_strdup_printf("#%s", cinfo->to.channel.name);
     result = g_string_append(result, r);
     g_free(r);
   } else {
@@ -416,10 +416,11 @@ static gboolean discord_replace_channel(const GMatchInfo *match,
   return FALSE;
 }
 
-static void discord_prepare_message(struct im_connection *ic,
+static gboolean discord_prepare_message(struct im_connection *ic,
                                     json_value *minfo,
                                     channel_info *cinfo, gboolean is_edit)
 {
+  gboolean posted = FALSE;
   gchar *msg = json_o_strdup(minfo, "content");
 
   if (is_edit == TRUE) {
@@ -446,7 +447,7 @@ static void discord_prepare_message(struct im_connection *ic,
 
   if (cinfo->type == CHANNEL_PRIVATE) {
     if (g_strcmp0(author, cinfo->to.handle.name) == 0) {
-      discord_post_message(cinfo, cinfo->to.handle.name, msg);
+      posted = discord_post_message(cinfo, cinfo->to.handle.name, msg);
     }
   } else if (cinfo->type == CHANNEL_TEXT) {
     json_value *mentions = json_o_get(minfo, "mentions");
@@ -475,7 +476,7 @@ static void discord_prepare_message(struct im_connection *ic,
                                        ic->proto_data, NULL);
     g_regex_unref(cregex);
 
-    discord_post_message(cinfo, author, fmsg);
+    posted = discord_post_message(cinfo, author, fmsg);
     g_free(fmsg);
   }
 
@@ -483,11 +484,12 @@ static void discord_prepare_message(struct im_connection *ic,
   if (attachments != NULL && attachments->type == json_array) {
     for (int aidx = 0; aidx < attachments->u.array.length; aidx++) {
       const char *url = json_o_str(attachments->u.array.values[aidx], "url");
-      discord_post_message(cinfo, author, (char *)url);
+      posted = discord_post_message(cinfo, author, (char *)url);
     }
   }
   g_free(author);
   g_free(msg);
+  return posted;
 }
 
 void discord_handle_message(struct im_connection *ic, json_value *minfo,
@@ -508,11 +510,14 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
   if (action == ACTION_CREATE) {
     guint64 msgid = g_ascii_strtoull(json_o_str(minfo, "id"), NULL, 10);
     if (msgid > cinfo->last_msg) {
-      discord_prepare_message(ic, minfo, cinfo, FALSE);
-      if (g_strcmp0(json_o_str(json_o_get(minfo, "author"), "id"), dd->id)) {
-        discord_http_send_ack(ic, cinfo->id, json_o_str(minfo, "id"));
+      gboolean posted = discord_prepare_message(ic, minfo, cinfo, FALSE);
+      if (posted) {
+        if (g_strcmp0(json_o_str(json_o_get(minfo, "author"), "id"), dd->id)) {
+          discord_http_send_ack(ic, cinfo->id, json_o_str(minfo, "id"));
+        }
+        cinfo->last_msg = msgid;
+        cinfo->last_read = msgid;
       }
-      cinfo->last_msg = msgid;
     }
   } else if (action == ACTION_UPDATE) {
     if (json_o_str(json_o_get(minfo, "author"), "username") != NULL) {
@@ -572,7 +577,7 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
     dd->seq = seq->u.integer;
   }
 
-  if (op == 10) {
+  if (op == OPCODE_HELLO) {
     json_value *data = json_o_get(js, "d");
     json_value *hbeat = json_o_get(data, "heartbeat_interval");
     if (hbeat != NULL && hbeat->type == json_integer) {
@@ -584,7 +589,7 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
 
     dd->keepalive_loop_id = b_timeout_add(dd->keepalive_interval,
                                           discord_ws_keepalive_loop, ic);
-  } else if (op == 11) {
+  } else if (op == OPCODE_HEARTBEAT_ACK) {
     // heartbeat ack
   } else if (g_strcmp0(event, "READY") == 0) {
     dd->state = WS_ALMOST_READY;
@@ -619,6 +624,29 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
         }
       }
     }
+
+    if (set_getint(&ic->acc->set, "max_backlog") > 0) {
+      json_value *rs = json_o_get(data, "read_state");
+      if (rs != NULL && rs->type == json_array) {
+        for (int rsidx = 0; rsidx < rs->u.array.length; rsidx++) {
+          if (rs->u.array.values[rsidx]->type == json_object) {
+            json_value *rsinfo = rs->u.array.values[rsidx];
+
+            const char *channel_id = json_o_str(rsinfo, "id");
+            const char *lmsg = json_o_str(rsinfo, "last_message_id");
+            guint64 lm = 0;
+            if (lmsg != NULL) {
+              lm = g_ascii_strtoull(lmsg, NULL, 10);
+            }
+            channel_info *cinfo = get_channel(dd, channel_id, NULL, SEARCH_ID);
+            if (cinfo != NULL) {
+              cinfo->last_read = lm;
+            }
+          }
+        }
+      }
+    }
+
   } else if (g_strcmp0(event, "GUILD_SYNC") == 0) {
     json_value *data = json_o_get(js, "d");
     const char *id   = json_o_str(data, "id");
@@ -641,39 +669,10 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
     }
 
     dd->pending_sync--;
-    if (dd->pending_sync < 1) {
-      if (set_getint(&ic->acc->set, "max_backlog") > 0) {
-        json_value *rs = json_o_get(data, "read_state");
-        if (rs != NULL && rs->type == json_array) {
-          for (int rsidx = 0; rsidx < rs->u.array.length; rsidx++) {
-            if (rs->u.array.values[rsidx]->type == json_object) {
-              json_value *rsinfo = rs->u.array.values[rsidx];
-
-              const char *channel_id = json_o_str(rsinfo, "id");
-              const char *lmsg = json_o_str(rsinfo, "last_message_id");
-              guint64 lm = 0;
-              if (lmsg != NULL) {
-                lm = g_ascii_strtoull(lmsg, NULL, 10);
-              }
-              channel_info *cinfo = get_channel(dd, channel_id, NULL, SEARCH_ID);
-              if (cinfo != NULL && cinfo->last_msg > lm) {
-                char *rlmsg = g_strdup_printf("%lu", cinfo->last_msg);
-                cinfo->last_msg = lm;
-                discord_http_get_backlog(ic, channel_id);
-                discord_http_send_ack(ic, cinfo->id, rlmsg);
-                g_free(rlmsg);
-              }
-            }
-          }
-        }
-      }
-
-      if (dd->state == WS_ALMOST_READY) {
-        dd->state = WS_READY;
-      }
+    if (dd->pending_sync < 1 && dd->state == WS_ALMOST_READY) {
+      dd->state = WS_READY;
+      imcb_connected(ic);
     }
-
-    imcb_connected(ic);
   } else if (g_strcmp0(event, "VOICE_STATE_UPDATE") == 0) {
     json_value *vsinfo = json_o_get(js, "d");
     discord_handle_voice_state(ic, vsinfo, json_o_str(vsinfo, "guild_id"));

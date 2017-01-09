@@ -16,6 +16,22 @@
  */
 #include "discord.h"
 
+typedef enum {
+  OPCODE_DISPATCH,
+  OPCODE_HEARTBEAT,
+  OPCODE_IDENTIFY,
+  OPCODE_STATUS_UPDATE,
+  OPCODE_VOICE_UPDATE,
+  OPCODE_VOICE_PING,
+  OPCODE_RESUME,
+  OPCODE_RECONNECT,
+  OPCODE_REQUEST_MEMBERS,
+  OPCODE_INVALID_SESSION,
+  OPCODE_HELLO,
+  OPCODE_HEARTBEAT_ACK,
+  OPCODE_REQUEST_SYNC
+} discord_opcode;
+
 gboolean discord_ws_keepalive_loop(gpointer data, gint fd,
                                    b_input_condition cond);
 

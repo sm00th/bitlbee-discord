@@ -88,6 +88,7 @@ static void discord_logout(struct im_connection *ic)
   discord_ws_cleanup(dd);
 
   free_discord_data(dd);
+  g_slist_free(ic->chatlist);
 }
 
 static void discord_chat_msg(struct groupchat *gc, char *msg, int flags)
@@ -95,6 +96,53 @@ static void discord_chat_msg(struct groupchat *gc, char *msg, int flags)
   channel_info *cinfo = gc->data;
 
   discord_http_send_msg(gc->ic, cinfo->id, msg);
+}
+
+static void discord_chat_list(struct im_connection *ic, const char *server)
+{
+  imcb_chat_list_finish(ic);
+}
+
+static struct groupchat *discord_chat_join(struct im_connection *ic,
+                                           const char *room,
+                                           const char *nick,
+                                           const char *password,
+                                           set_t **sets)
+{
+  discord_data *dd = ic->proto_data;
+  struct groupchat *gc = NULL;
+  server_info *sinfo = NULL;
+  channel_info *cinfo = get_channel(dd, room, NULL, SEARCH_FNAME);
+
+  if (cinfo == NULL || cinfo->type != CHANNEL_TEXT) {
+    return NULL;
+  }
+
+  sinfo = cinfo->to.channel.sinfo;
+  gc = imcb_chat_new(ic, cinfo->to.channel.name);
+  if (cinfo->to.channel.bci->topic != NULL) {
+    imcb_chat_topic(gc, "root", cinfo->to.channel.bci->topic, 0);
+  }
+
+  for (GSList *ul = sinfo->users; ul; ul = g_slist_next(ul)) {
+    user_info *uinfo = ul->data;
+    if (uinfo->user->flags & BEE_USER_ONLINE) {
+      imcb_chat_add_buddy(gc, uinfo->user->handle);
+    }
+  }
+  imcb_chat_add_buddy(gc, dd->uname);
+
+  cinfo->to.channel.gc = gc;
+  gc->data = cinfo;
+
+  if (cinfo->last_msg > cinfo->last_read) {
+    char *rlmsg = g_strdup_printf("%lu", cinfo->last_msg);
+    cinfo->last_msg = cinfo->last_read;
+    discord_http_get_backlog(ic, cinfo->id);
+    g_free(rlmsg);
+  }
+
+  return gc;
 }
 
 static int discord_buddy_msg(struct im_connection *ic, char *to, char *msg,
@@ -155,6 +203,8 @@ G_MODULE_EXPORT void init_plugin(void)
     .login = discord_login,
     .logout = discord_logout,
     .chat_msg = discord_chat_msg,
+    .chat_list = discord_chat_list,
+    .chat_join = discord_chat_join,
     .buddy_msg = discord_buddy_msg,
     .handle_cmp = g_strcmp0,
     .handle_is_self = discord_is_self,

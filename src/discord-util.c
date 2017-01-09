@@ -31,7 +31,13 @@ void free_channel_info(channel_info *cinfo)
   if (cinfo->type != CHANNEL_TEXT) {
     g_free(cinfo->to.handle.name);
   } else {
-    imcb_chat_free(cinfo->to.channel.gc);
+    if (cinfo->to.channel.gc != NULL) {
+      imcb_chat_free(cinfo->to.channel.gc);
+    }
+    g_free(cinfo->to.channel.name);
+    g_free(cinfo->to.channel.bci->title);
+    g_free(cinfo->to.channel.bci->topic);
+    g_free(cinfo->to.channel.bci);
   }
 
   g_free(cinfo);
@@ -80,9 +86,19 @@ static gint cmp_chan_name(const channel_info *cinfo, const char *cname)
 {
   gchar *ciname = NULL;
   if (cinfo->type == CHANNEL_TEXT) {
-    ciname = cinfo->to.channel.gc->title;
+    ciname = cinfo->to.channel.name;
   } else {
     ciname = cinfo->to.handle.name;
+  }
+
+  return g_strcmp0(ciname, cname);
+}
+
+static gint cmp_chan_fname(const channel_info *cinfo, const char *cname)
+{
+  gchar *ciname = NULL;
+  if (cinfo->type == CHANNEL_TEXT) {
+    ciname = cinfo->to.channel.bci->title;
   }
 
   return g_strcmp0(ciname, cname);
@@ -93,7 +109,7 @@ static gint cmp_chan_name_ignorecase(const channel_info *cinfo,
 {
   gchar *cfn1 = NULL;
   if (cinfo->type == CHANNEL_TEXT) {
-    cfn1 = g_utf8_casefold(cinfo->to.channel.gc->title, -1);
+    cfn1 = g_utf8_casefold(cinfo->to.channel.name, -1);
   } else {
     cfn1 = g_utf8_casefold(cinfo->to.handle.name, -1);
   }
@@ -184,6 +200,9 @@ channel_info *get_channel(discord_data *dd, const char *channel_id,
       break;
     case SEARCH_NAME_IGNORECASE:
       sfunc = (GCompareFunc)cmp_chan_name_ignorecase;
+      break;
+    case SEARCH_FNAME:
+      sfunc = (GCompareFunc)cmp_chan_fname;
       break;
     default:
       return NULL;

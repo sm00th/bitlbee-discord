@@ -82,10 +82,9 @@ static int discord_ws_send_payload(discord_data *dd, const char *pload,
 void discord_ws_sync_server(discord_data *dd, const char *id)
 {
   GString *buf = g_string_new("");
-  g_string_printf(buf, "{\"op\":12,\"d\":[\"%s\"]}", id);
+  g_string_printf(buf, "{\"op\":%d,\"d\":[\"%s\"]}", OPCODE_REQUEST_SYNC, id);
   discord_ws_send_payload(dd, buf->str, buf->len);
   g_string_free(buf, TRUE);
-  g_main_context_iteration(NULL, TRUE);
 }
 
 static gboolean discord_ws_writable(gpointer data, int source,
@@ -94,7 +93,7 @@ static gboolean discord_ws_writable(gpointer data, int source,
   discord_data *dd = (discord_data*)data;
   if (dd->state == WS_CONNECTED) {
     GString *buf = g_string_new("");
-    g_string_printf(buf, "{\"d\":{\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"},\"compress\":false,\"large_threshold\":250,\"synced_guilds\":[]},\"op\":2}", dd->token);
+    g_string_printf(buf, "{\"d\":{\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"},\"compress\":false,\"large_threshold\":250,\"synced_guilds\":[]},\"op\":%d}", dd->token, OPCODE_IDENTIFY);
 
     discord_ws_send_payload(dd, buf->str, buf->len);
     g_string_free(buf, TRUE);
@@ -102,9 +101,9 @@ static gboolean discord_ws_writable(gpointer data, int source,
     GString *buf = g_string_new("");
 
     if (dd->seq == 0) {
-      g_string_printf(buf, "{\"op\":1,\"d\":null}");
+      g_string_printf(buf, "{\"op\":%d,\"d\":null}", OPCODE_HEARTBEAT);
     } else {
-      g_string_printf(buf, "{\"op\":1,\"d\":%lu}", dd->seq);
+      g_string_printf(buf, "{\"op\":%d,\"d\":%lu}", OPCODE_HEARTBEAT, dd->seq);
     }
     discord_ws_send_payload(dd, buf->str, buf->len);
     g_string_free(buf, TRUE);
@@ -317,11 +316,11 @@ void discord_ws_set_status(discord_data *dd, gboolean idle, gchar *message)
   }
 
   if (idle == TRUE) {
-    g_string_printf(buf, "{\"op\":3,\"d\":{\"idle_since\":%tu,\"game\":{\"name\":\"%s\"}}}", time(NULL), msg);
+    g_string_printf(buf, "{\"op\":%d,\"d\":{\"idle_since\":%tu,\"game\":{\"name\":\"%s\"}}}", OPCODE_STATUS_UPDATE, time(NULL), msg);
   } else if (message != NULL) {
-    g_string_printf(buf, "{\"op\":3,\"d\":{\"idle_since\":null,\"game\":{\"name\":\"%s\"}}}", msg);
+    g_string_printf(buf, "{\"op\":%d,\"d\":{\"idle_since\":null,\"game\":{\"name\":\"%s\"}}}", OPCODE_STATUS_UPDATE, msg);
   } else {
-    g_string_printf(buf, "{\"op\":3,\"d\":{\"idle_since\":null,\"game\":{\"name\":null}}}");
+    g_string_printf(buf, "{\"op\":%d,\"d\":{\"idle_since\":null,\"game\":{\"name\":null}}}", OPCODE_STATUS_UPDATE);
   }
   discord_ws_send_payload(dd, buf->str, buf->len);
   g_string_free(buf, TRUE);
