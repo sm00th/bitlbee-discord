@@ -21,6 +21,8 @@
 #include "discord-http.h"
 #include "discord-websockets.h"
 
+#define GLOBAL_SERVER_ID "0"
+
 static void discord_handle_voice_state(struct im_connection *ic,
                                        json_value *vsinfo,
                                        const char *server_id)
@@ -212,9 +214,10 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
           ci->to.handle.ic = ic;
 
           dd->pchannels = g_slist_prepend(dd->pchannels, ci);
-          discord_handle_user(ic, rcp, sinfo ? sinfo->id : NULL, ACTION_CREATE);
+          discord_handle_user(ic, rcp, sinfo ? sinfo->id : GLOBAL_SERVER_ID,
+                              ACTION_CREATE);
         } else {
-          g_print("Failed to recepient for private channel.\n");
+          g_print("Failed to get recepient for private channel.\n");
           free_channel_info(ci);
         }
         break;
@@ -304,6 +307,16 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
       }
     }
   }
+}
+
+static void discord_add_global_server(struct im_connection *ic) {
+  discord_data *dd = ic->proto_data;
+    server_info *sinfo = g_new0(server_info, 1);
+
+    sinfo->name = g_strdup("_global");
+    sinfo->id = g_strdup(GLOBAL_SERVER_ID);
+    sinfo->ic = ic;
+    dd->servers = g_slist_prepend(dd->servers, sinfo);
 }
 
 static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
@@ -605,6 +618,7 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
       dd->uname = discord_canonize_name(json_o_str(user, "username"));
     }
 
+    discord_add_global_server(ic);
     json_value *guilds = json_o_get(data, "guilds");
     if (guilds != NULL && guilds->type == json_array) {
       for (int gidx = 0; gidx < guilds->u.array.length; gidx++) {
