@@ -43,7 +43,7 @@ m4_define_default(
 )
 
 # Checks for libraries.
-PKG_CHECK_MODULES([BITLBEE], [bitlbee >= 3.4])
+PKG_CHECK_MODULES([BITLBEE], [bitlbee >= 3.5])
 PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.32])
 
 # Checks for typedefs, structures, and compiler characteristics.
