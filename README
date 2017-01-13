@@ -19,7 +19,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 Build dependencies
 ------------------
-- bitlbee and headers >= 3.4
+- bitlbee and headers >= 3.5
   If using distribution version of bitlbee you will need to install the dev
   package, usually bitlbee-dev or bitlbee-devel. If bitlbee was built from
   source don't forget to do `make install-dev`.
@@ -55,6 +55,21 @@ Plugin adds 'discord' protocol to bitlbee, add your account as usual:
 
   > account add discord <email> <password>
   > account discord on
+
+You also need to configure discord channels you would like to join/autojoin. To
+do that use bitlbee's 'chat list' functionality (`help chat list` and `help
+chat add`):
+  > chat list discord
+
+This will show you the list of available channel with indexes that can be used
+for adding channels.
+
+  > chat add discord !1 #mydiscordchannel
+  > chan #mydiscordchannel set auto_join true
+  > /join #mydiscordchannel
+
+If you set auto_join to true, next time you reconnect there will be no need to
+join the channel manually.
 
 Options
 -------
@@ -122,8 +137,7 @@ This section describes options available throug "account set" bitlbee command
 
 Bugs
 ----
-Plugin is in early development stages, so there should be plenty, please report
-them at github: https://github.com/sm00th/bitlbee-discord/issues
+Please report bugs at github: https://github.com/sm00th/bitlbee-discord/issues
 For questions, bitlbee-discord breakage demonstrations and chitchat you can
 join the following discord server: https://discord.gg/0lUXEAZXmvW3ovUC or ping
-trac3r on irc.oftc.net/#bitlbee.
+trac3r on irc.oftc.net/#bitlbee (irc is preferable).
