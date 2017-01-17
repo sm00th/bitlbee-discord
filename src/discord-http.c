@@ -144,7 +144,7 @@ static void discord_http_mfa_cb(struct http_request *req)
     g_free(dd->token);
     discord_http_get_gateway(ic, json_o_str(js, "token"));
   } else {
-    imcb_error(ic, (char*)json_o_str(js, "message"));
+    imcb_error(ic, "MFA Error: %s", (char*)json_o_str(js, "message"));
     imc_logout(ic, TRUE);
   }
   json_value_free(js);
@@ -176,7 +176,7 @@ static void discord_http_login_cb(struct http_request *req)
       discord_http_get_gateway(ic, json_o_str(js, "token"));
     }
   } else {
-    imcb_error(ic, (char*)json_o_str(js, "message"));
+    imcb_error(ic, "Login error: %s", (char*)json_o_str(js, "message"));
     imc_logout(ic, TRUE);
   }
   json_value_free(js);
