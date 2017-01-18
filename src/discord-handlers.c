@@ -14,6 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include <config.h>
 #include <bitlbee/json_util.h>
 
 #include "discord-util.h"
@@ -572,6 +574,10 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
 {
   discord_data *dd = ic->proto_data;
   json_value *js = json_parse((gchar*)buf, size);
+
+#ifdef DEBUG
+  g_print("<<< %s: %lu\n%s\n\n", __func__, size, buf);
+#endif
 
   if (!js || js->type != json_object) {
     imcb_error(ic, "Failed to parse json reply.");

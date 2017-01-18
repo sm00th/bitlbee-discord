@@ -46,6 +46,8 @@ m4_define_default(
 PKG_CHECK_MODULES([BITLBEE], [bitlbee >= 3.5])
 PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.32])
 
+AC_CONFIG_HEADERS([config.h])
+
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
 
@@ -70,6 +72,12 @@ AS_IF(
 )
 
 AC_SUBST([plugindir])
+
+AC_ARG_ENABLE(debug, AS_HELP_STRING([--enable-debug],[Enable debugging support]),
+        [ if test x$enableval = xyes ; then
+                AC_DEFINE(DEBUG,1,[ Define to enable debugging info. ])
+          fi
+         ])
 
 AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT

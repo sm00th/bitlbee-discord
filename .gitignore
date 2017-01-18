@@ -18,3 +18,7 @@ libtool.m4
 lt*.m4
 Makefile
 Makefile.in
+config.h*
+stamp-h1
+TAGS
+src/TAGS

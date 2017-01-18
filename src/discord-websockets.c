@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <config.h>
 #include <bitlbee/ssl_client.h>
 #include <bitlbee/events.h>
 
@@ -42,6 +43,10 @@ static int discord_ws_send_payload(discord_data *dd, const char *pload,
   size_t ret = 0;
   guchar mkey[4];
   gchar *mpload;
+
+#ifdef DEBUG
+  g_print(">>> %s: %lu\n%s\n\n", __func__, psize, pload);
+#endif
 
   random_bytes(mkey, sizeof(mkey));
   mpload = discord_ws_mask(mkey, pload, psize);

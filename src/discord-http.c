@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <config.h>
 #include <bitlbee/http_client.h>
 #include <bitlbee/json.h>
 #include <bitlbee/json_util.h>
@@ -48,6 +49,10 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
                   set_getstr(&ic->acc->set, "host"),
                   dd->token);
 
+#ifdef DEBUG
+  g_print(">>> %s: %lu\n%s\n\n", __func__, request->len, request->str);
+#endif
+
   (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                         request->str, cb_func, data);
   g_string_free(request, TRUE);
@@ -56,6 +61,11 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
 static void discord_http_gateway_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
+
+#ifdef DEBUG
+  g_print("<<< %s: [%d] %d\n%s\n\n", __func__, req->status_code,
+          req->body_size, req->reply_body);
+#endif
 
   if (req->status_code == 200) {
     json_value *js = json_parse(req->reply_body, req->body_size);
@@ -129,6 +139,11 @@ static void discord_http_mfa_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
 
+#ifdef DEBUG
+  g_print("<<< %s: [%d] %d\n%s\n\n", __func__, req->status_code,
+          req->body_size, req->reply_body);
+#endif
+
   json_value *js = json_parse(req->reply_body, req->body_size);
   if (!js || js->type != json_object) {
     imcb_error(ic, "Failed to parse json reply.");
@@ -153,6 +168,11 @@ static void discord_http_mfa_cb(struct http_request *req)
 static void discord_http_login_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
+
+#ifdef DEBUG
+  g_print("<<< %s: [%d] %d\n%s\n\n", __func__, req->status_code,
+          req->body_size, req->reply_body);
+#endif
 
   json_value *js = json_parse(req->reply_body, req->body_size);
   if (!js || js->type != json_object) {
@@ -190,6 +210,12 @@ static void discord_http_noop_cb(struct http_request *req)
 static void discord_http_send_msg_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
+
+#ifdef DEBUG
+  g_print("<<< %s: [%d] %d\n%s\n\n", __func__, req->status_code,
+          req->body_size, req->reply_body);
+#endif
+
   if (req->status_code != 200) {
     imcb_error(ic, "Failed to send message (%d).", req->status_code);
   }
@@ -198,6 +224,12 @@ static void discord_http_send_msg_cb(struct http_request *req)
 static void discord_http_backlog_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
+
+#ifdef DEBUG
+  g_print("<<< %s: [%d] %d\n%s\n\n", __func__, req->status_code,
+          req->body_size, req->reply_body);
+#endif
+
   if (req->status_code != 200) {
     imcb_error(ic, "Failed to get backlog (%d).", req->status_code);
   } else {
@@ -358,6 +390,10 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
                   content->len,
                   content->str);
 
+#ifdef DEBUG
+  g_print(">>> %s: %lu\n%s\n\n", __func__, request->len, request->str);
+#endif
+
   (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_send_msg_cb, ic);
 
@@ -386,6 +422,10 @@ void discord_http_send_ack(struct im_connection *ic, const char *channel_id,
                   set_getstr(&ic->acc->set, "host"),
                   dd->token);
 
+#ifdef DEBUG
+  g_print(">>> %s: %lu\n%s\n\n", __func__, request->len, request->str);
+#endif
+
   (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_noop_cb,
                                    NULL);
@@ -412,6 +452,10 @@ void discord_http_mfa_auth(struct im_connection *ic, const char *msg)
                   set_getstr(&ic->acc->set, "host"),
                   auth->len,
                   auth->str);
+
+#ifdef DEBUG
+  g_print(">>> %s: %lu\n%s\n\n", __func__, request->len, request->str);
+#endif
 
   (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_mfa_cb,
@@ -440,6 +484,10 @@ void discord_http_login(account_t *acc)
                   set_getstr(&acc->set, "host"),
                   jlogin->len,
                   jlogin->str);
+
+#ifdef DEBUG
+  g_print(">>> %s: %lu\n%s\n\n", __func__, request->len, request->str);
+#endif
 
   (void) http_dorequest(set_getstr(&acc->set, "host"), 443, 1,
                                    request->str, discord_http_login_cb,
@@ -509,6 +557,11 @@ void discord_http_create_and_send_msg(struct im_connection *ic,
   casm_data *cd = g_new0(casm_data, 1);
   cd->ic = ic;
   cd->msg = g_strdup(msg);
+
+#ifdef DEBUG
+  g_print(">>> %s: %lu\n%s\n\n", __func__, request->len, request->str);
+#endif
+
   (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_casm_cb, cd);
 
