@@ -15,6 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "discord.h"
+#include <stdlib.h>
+#include <glib.h>
 
 typedef enum {
   SEARCH_UNKNOWN,
@@ -39,3 +41,4 @@ void free_user_info(user_info *uinfo);
 void free_gw_data(gw_data *gw);
 char *discord_canonize_name(const char *name);
 char *discord_escape_string(const char *msg);
+void discord_debug(char *format, ...);

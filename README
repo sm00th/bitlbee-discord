@@ -138,11 +138,13 @@ This section describes options available throug "account set" bitlbee command
 
 Debugging
 ---------
-You can enable extra debug output for bitlbee-discord, to do so add
-"--enable-debug" option to "./configure". This will enable bitlbee-discord to
-print all traffic it exchanges with discord servers to stdout and there is a
-lot of it. To get it on your screen run bitlbee by hand in foreground mode:
-"bitlbee -nvD", then connect with an irc client as you usually do.
+You can enable extra debug output for bitlbee-discord, by setting BITLBEE_DEBUG
+environment variable. This will enable bitlbee-discord to print all traffic it
+exchanges with discord servers to stdout and there is a lot of it. To get it
+on your screen run bitlbee by hand in foreground mode: 
+  $ BITLBEE_DEBUG=1 bitlbee -nvD
+then connect with an irc client as you usually do.
+
 WARNING: there IS sensitive information in this debug output, such as auth
 tokens, your plaintext password and, obviosly, your incoming and outgoing
 messages. Be sure to remove any information you are not willing to share before

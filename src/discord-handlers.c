@@ -575,9 +575,7 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
   discord_data *dd = ic->proto_data;
   json_value *js = json_parse((gchar*)buf, size);
 
-#ifdef DEBUG
-  g_print("<<< %s: %lu\n%s\n\n", __func__, size, buf);
-#endif
+  discord_debug("<<< (%s) %s %lu\n%s\n", dd->uname, __func__, size, buf);
 
   if (!js || js->type != json_object) {
     imcb_error(ic, "Failed to parse json reply.");

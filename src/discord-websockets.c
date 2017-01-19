@@ -44,9 +44,7 @@ static int discord_ws_send_payload(discord_data *dd, const char *pload,
   guchar mkey[4];
   gchar *mpload;
 
-#ifdef DEBUG
-  g_print(">>> %s: %lu\n%s\n\n", __func__, psize, pload);
-#endif
+  discord_debug(">>> (%s) %s %lu\n%s\n", dd->uname, __func__, psize, pload);
 
   random_bytes(mkey, sizeof(mkey));
   mpload = discord_ws_mask(mkey, pload, psize);

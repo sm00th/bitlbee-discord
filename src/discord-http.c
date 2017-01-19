@@ -49,9 +49,7 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
                   set_getstr(&ic->acc->set, "host"),
                   dd->token);
 
-#ifdef DEBUG
-  g_print(">>> %s: %lu\n%s\n\n", __func__, request->len, request->str);
-#endif
+  discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
   (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                         request->str, cb_func, data);
@@ -61,11 +59,10 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
 static void discord_http_gateway_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
+  discord_data *dd = ic->proto_data;
 
-#ifdef DEBUG
-  g_print("<<< %s: [%d] %d\n%s\n\n", __func__, req->status_code,
-          req->body_size, req->reply_body);
-#endif
+  discord_debug("<<< (%s) %s [%d] %d\n%s\n", dd->uname, __func__,
+                req->status_code, req->body_size, req->reply_body);
 
   if (req->status_code == 200) {
     json_value *js = json_parse(req->reply_body, req->body_size);
@@ -138,11 +135,10 @@ void discord_http_get_gateway(struct im_connection *ic, const char *token)
 static void discord_http_mfa_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
+  discord_data *dd = ic->proto_data;
 
-#ifdef DEBUG
-  g_print("<<< %s: [%d] %d\n%s\n\n", __func__, req->status_code,
-          req->body_size, req->reply_body);
-#endif
+  discord_debug("<<< (%s) %s [%d] %d\n%s\n", dd->uname, __func__,
+                req->status_code, req->body_size, req->reply_body);
 
   json_value *js = json_parse(req->reply_body, req->body_size);
   if (!js || js->type != json_object) {
@@ -168,11 +164,10 @@ static void discord_http_mfa_cb(struct http_request *req)
 static void discord_http_login_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
+  discord_data *dd = ic->proto_data;
 
-#ifdef DEBUG
-  g_print("<<< %s: [%d] %d\n%s\n\n", __func__, req->status_code,
-          req->body_size, req->reply_body);
-#endif
+  discord_debug("<<< (%s) %s [%d] %d\n%s\n", dd->uname, __func__,
+                req->status_code, req->body_size, req->reply_body);
 
   json_value *js = json_parse(req->reply_body, req->body_size);
   if (!js || js->type != json_object) {
@@ -210,11 +205,10 @@ static void discord_http_noop_cb(struct http_request *req)
 static void discord_http_send_msg_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
+  discord_data *dd = ic->proto_data;
 
-#ifdef DEBUG
-  g_print("<<< %s: [%d] %d\n%s\n\n", __func__, req->status_code,
-          req->body_size, req->reply_body);
-#endif
+  discord_debug("<<< (%s) %s [%d] %d\n%s\n", dd->uname, __func__,
+                req->status_code, req->body_size, req->reply_body);
 
   if (req->status_code != 200) {
     imcb_error(ic, "Failed to send message (%d).", req->status_code);
@@ -224,11 +218,10 @@ static void discord_http_send_msg_cb(struct http_request *req)
 static void discord_http_backlog_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
+  discord_data *dd = ic->proto_data;
 
-#ifdef DEBUG
-  g_print("<<< %s: [%d] %d\n%s\n\n", __func__, req->status_code,
-          req->body_size, req->reply_body);
-#endif
+  discord_debug("<<< (%s) %s [%d] %d\n%s\n", dd->uname, __func__,
+                req->status_code, req->body_size, req->reply_body);
 
   if (req->status_code != 200) {
     imcb_error(ic, "Failed to get backlog (%d).", req->status_code);
@@ -390,9 +383,7 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
                   content->len,
                   content->str);
 
-#ifdef DEBUG
-  g_print(">>> %s: %lu\n%s\n\n", __func__, request->len, request->str);
-#endif
+  discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
   (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_send_msg_cb, ic);
@@ -422,9 +413,7 @@ void discord_http_send_ack(struct im_connection *ic, const char *channel_id,
                   set_getstr(&ic->acc->set, "host"),
                   dd->token);
 
-#ifdef DEBUG
-  g_print(">>> %s: %lu\n%s\n\n", __func__, request->len, request->str);
-#endif
+  discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
   (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_noop_cb,
@@ -453,9 +442,7 @@ void discord_http_mfa_auth(struct im_connection *ic, const char *msg)
                   auth->len,
                   auth->str);
 
-#ifdef DEBUG
-  g_print(">>> %s: %lu\n%s\n\n", __func__, request->len, request->str);
-#endif
+  discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
   (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_mfa_cb,
@@ -470,6 +457,7 @@ void discord_http_login(account_t *acc)
   GString *request = g_string_new("");
   GString *jlogin = g_string_new("");
   gchar *epass = discord_escape_string(acc->pass);
+  discord_data *dd = acc->ic->proto_data;
 
   g_string_printf(jlogin, "{\"email\":\"%s\",\"password\":\"%s\"}",
                   acc->user,
@@ -485,9 +473,7 @@ void discord_http_login(account_t *acc)
                   jlogin->len,
                   jlogin->str);
 
-#ifdef DEBUG
-  g_print(">>> %s: %lu\n%s\n\n", __func__, request->len, request->str);
-#endif
+  discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
   (void) http_dorequest(set_getstr(&acc->set, "host"), 443, 1,
                                    request->str, discord_http_login_cb,
@@ -558,9 +544,7 @@ void discord_http_create_and_send_msg(struct im_connection *ic,
   cd->ic = ic;
   cd->msg = g_strdup(msg);
 
-#ifdef DEBUG
-  g_print(">>> %s: %lu\n%s\n\n", __func__, request->len, request->str);
-#endif
+  discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
   (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_casm_cb, cd);

@@ -73,11 +73,5 @@ AS_IF(
 
 AC_SUBST([plugindir])
 
-AC_ARG_ENABLE(debug, AS_HELP_STRING([--enable-debug],[Enable debugging support]),
-        [ if test x$enableval = xyes ; then
-                AC_DEFINE(DEBUG,1,[ Define to enable debugging info. ])
-          fi
-         ])
-
 AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT

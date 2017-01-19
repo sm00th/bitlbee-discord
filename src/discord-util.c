@@ -16,6 +16,26 @@
  */
 #include "discord-util.h"
 
+void discord_debug(char *format, ...)
+{
+  gchar *buf;
+  va_list params;
+  va_start(params, format);
+  buf = g_strdup_vprintf(format, params);
+  va_end(params);
+
+  if (getenv("BITLBEE_DEBUG")) {
+    GDateTime *dt = g_date_time_new_now_local();
+    gchar *tstr = g_date_time_format(dt, "%T");
+
+    g_print("[%s] %s\n", tstr, buf);
+
+    g_free(tstr);
+    g_date_time_unref(dt);
+  }
+  g_free(buf);
+}
+
 void free_user_info(user_info *uinfo)
 {
   g_free(uinfo->name);
