@@ -95,6 +95,7 @@ This section describes options available throug "account set" bitlbee command
   - max_backlog (type: integer; default: 50)
     Maximum number of backlog messages per channel to fetch on connection.
     Unlike twitter implementation in bitlbee this won't dump seen messages.
+    Setting this to 0 or negative values disables backlog fetching.
 
   - send_acks (type: boolean; default: yes)
     By default bitlbee-discord will send an "ack" for every message received,
