@@ -304,6 +304,10 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
         clist = &sinfo->channels;
       }
 
+      if (cdata->type == CHANNEL_TEXT) {
+        ic->chatlist = g_slist_remove(ic->chatlist, cdata->to.channel.bci);
+      }
+
       *clist = g_slist_remove(*clist, cdata);
       free_channel_info(cdata);
     } else if (action == ACTION_UPDATE) {
