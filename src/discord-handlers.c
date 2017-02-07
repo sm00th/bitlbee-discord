@@ -242,10 +242,15 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
         }
 
         bee_chat_info_t *bci = g_new0(bee_chat_info_t, 1);
+        while (get_channel(dd, fullname, NULL, SEARCH_FNAME) != NULL) {
+          gchar *tmpname = fullname;
+          fullname = g_strconcat(tmpname, "_", NULL);
+          g_free(tmpname);
+        }
         bci->title = g_strdup(fullname);
         if (topic != NULL && strlen(topic) > 0) {
           bci->topic = g_strdup(topic);
-        } else if (plen == 0) {
+        } else {
           bci->topic = g_strdup_printf("%s/%s", sinfo->name, name);
         }
 

@@ -126,7 +126,7 @@ This section describes options available throug "account set" bitlbee command
     Contacts from this account will never appear as offline and will be marked
     away instead.
 
-  - server_prefix_len (type: int; default: 0)
+  - server_prefix_len (type: int; default: 3)
     Prefix channel names with this many characters of server name. If set to 0
     nothing will be prefixed. If set to anything lower than 0 - full server
     name will be prefixed. Assuming we have a channel "general" on "beecord"

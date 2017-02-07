@@ -56,7 +56,7 @@ static void discord_init(account_t *acc)
   s = set_add(&acc->set, "never_offline", "off", set_eval_bool, acc);
   s->flags |= ACC_SET_OFFLINE_ONLY;
 
-  s = set_add(&acc->set, "server_prefix_len", "0", set_eval_int, acc);
+  s = set_add(&acc->set, "server_prefix_len", "3", set_eval_int, acc);
   s->flags |= ACC_SET_OFFLINE_ONLY;
 
   s = set_add(&acc->set, "token_cache", NULL, NULL, acc);
