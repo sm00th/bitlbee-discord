@@ -39,6 +39,7 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
                              http_input_function cb_func, gpointer data)
 {
   discord_data *dd = ic->proto_data;
+  struct http_request *req;
   GString *request = g_string_new("");
   g_string_printf(request, "GET /api/%s HTTP/1.1\r\n"
                   "Host: %s\r\n"
@@ -51,8 +52,10 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
 
   discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
-  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
-                        request->str, cb_func, data);
+  req = http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
+                       request->str, cb_func, data);
+
+  dd->pending_reqs = g_slist_prepend(dd->pending_reqs, req);
   g_string_free(request, TRUE);
 }
 
@@ -63,6 +66,8 @@ static void discord_http_gateway_cb(struct http_request *req)
 
   discord_debug("<<< (%s) %s [%d] %d\n%s\n", dd->uname, __func__,
                 req->status_code, req->body_size, req->reply_body);
+
+  dd->pending_reqs = g_slist_remove(dd->pending_reqs, req);
 
   if (req->status_code == 200) {
     json_value *js = json_parse(req->reply_body, req->body_size);
@@ -139,6 +144,7 @@ static void discord_http_mfa_cb(struct http_request *req)
 
   discord_debug("<<< (%s) %s [%d] %d\n%s\n", dd->uname, __func__,
                 req->status_code, req->body_size, req->reply_body);
+  dd->pending_reqs = g_slist_remove(dd->pending_reqs, req);
 
   json_value *js = json_parse(req->reply_body, req->body_size);
   if (!js || js->type != json_object) {
@@ -168,6 +174,7 @@ static void discord_http_login_cb(struct http_request *req)
 
   discord_debug("<<< (%s) %s [%d] %d\n%s\n", dd->uname, __func__,
                 req->status_code, req->body_size, req->reply_body);
+  dd->pending_reqs = g_slist_remove(dd->pending_reqs, req);
 
   json_value *js = json_parse(req->reply_body, req->body_size);
   if (!js || js->type != json_object) {
@@ -199,6 +206,8 @@ static void discord_http_login_cb(struct http_request *req)
 
 static void discord_http_noop_cb(struct http_request *req)
 {
+  discord_data *dd = req->data;
+  dd->pending_reqs = g_slist_remove(dd->pending_reqs, req);
   return;
 }
 
@@ -206,6 +215,8 @@ static void discord_http_send_msg_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
   discord_data *dd = ic->proto_data;
+
+  dd->pending_reqs = g_slist_remove(dd->pending_reqs, req);
 
   discord_debug("<<< (%s) %s [%d] %d\n%s\n", dd->uname, __func__,
                 req->status_code, req->body_size, req->reply_body);
@@ -219,6 +230,8 @@ static void discord_http_backlog_cb(struct http_request *req)
 {
   struct im_connection *ic = req->data;
   discord_data *dd = ic->proto_data;
+
+  dd->pending_reqs = g_slist_remove(dd->pending_reqs, req);
 
   discord_debug("<<< (%s) %s [%d] %d\n%s\n", dd->uname, __func__,
                 req->status_code, req->body_size, req->reply_body);
@@ -251,6 +264,47 @@ void discord_http_get_backlog(struct im_connection *ic, const char *channel_id)
                   set_getint(&ic->acc->set, "max_backlog"));
 
   discord_http_get(ic, api->str, discord_http_backlog_cb, ic);
+
+  g_string_free(api, TRUE);
+}
+
+static void discord_http_pinned_cb(struct http_request *req)
+{
+  struct im_connection *ic = req->data;
+  discord_data *dd = ic->proto_data;
+
+  dd->pending_reqs = g_slist_remove(dd->pending_reqs, req);
+
+  discord_debug("<<< (%s) %s [%d] %d\n%s\n", dd->uname, __func__,
+                req->status_code, req->body_size, req->reply_body);
+
+  if (req->status_code != 200) {
+    imcb_error(ic, "Failed to get pinned messages (%d).", req->status_code);
+  } else {
+    json_value *messages = json_parse(req->reply_body, req->body_size);
+    if (!messages || messages->type != json_array) {
+      imcb_error(ic, "Failed to parse json reply for pinned messages.");
+      imc_logout(ic, TRUE);
+      json_value_free(messages);
+      return;
+    }
+
+    for (int midx = messages->u.array.length - 1; midx >= 0; midx--) {
+      json_value *minfo = messages->u.array.values[midx];
+      discord_handle_message(ic, minfo, ACTION_CREATE);
+    }
+
+    json_value_free(messages);
+  }
+}
+
+void discord_http_get_pinned(struct im_connection *ic, const char *channel_id)
+{
+  GString *api = g_string_new("");
+
+  g_string_printf(api, "channels/%s/pins", channel_id);
+
+  discord_http_get(ic, api->str, discord_http_pinned_cb, ic);
 
   g_string_free(api, TRUE);
 }
@@ -385,8 +439,11 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
 
   discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
-  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
-                                   request->str, discord_http_send_msg_cb, ic);
+  struct http_request *req;
+
+  req = http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
+                                  request->str, discord_http_send_msg_cb, ic);
+  dd->pending_reqs = g_slist_prepend(dd->pending_reqs, req);
 
   g_string_free(content, TRUE);
   g_string_free(request, TRUE);
@@ -415,9 +472,12 @@ void discord_http_send_ack(struct im_connection *ic, const char *channel_id,
 
   discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
-  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
+  struct http_request *req;
+
+  req = http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_noop_cb,
-                                   NULL);
+                                   dd);
+  dd->pending_reqs = g_slist_prepend(dd->pending_reqs, req);
 
   g_string_free(request, TRUE);
 }
@@ -443,10 +503,12 @@ void discord_http_mfa_auth(struct im_connection *ic, const char *msg)
                   auth->str);
 
   discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
+  struct http_request *req;
 
-  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
+  req = http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_mfa_cb,
                                    ic);
+  dd->pending_reqs = g_slist_prepend(dd->pending_reqs, req);
 
   g_string_free(auth, TRUE);
   g_string_free(request, TRUE);
@@ -475,9 +537,12 @@ void discord_http_login(account_t *acc)
 
   discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
-  (void) http_dorequest(set_getstr(&acc->set, "host"), 443, 1,
+  struct http_request *req;
+
+  req = http_dorequest(set_getstr(&acc->set, "host"), 443, 1,
                                    request->str, discord_http_login_cb,
                                    acc->ic);
+  dd->pending_reqs = g_slist_prepend(dd->pending_reqs, req);
 
   g_free(epass);
   g_string_free(jlogin, TRUE);
@@ -488,6 +553,8 @@ static void discord_http_casm_cb(struct http_request *req)
 {
   casm_data *cd = req->data;
   struct im_connection *ic = cd->ic;
+  discord_data *dd = ic->proto_data;
+  dd->pending_reqs = g_slist_remove(dd->pending_reqs, req);
   if (req->status_code != 200) {
     imcb_error(ic, "Failed to create private channel (%d).",
                req->status_code);
@@ -546,8 +613,11 @@ void discord_http_create_and_send_msg(struct im_connection *ic,
 
   discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
-  (void) http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
+  struct http_request *req;
+
+  req = http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
                                    request->str, discord_http_casm_cb, cd);
+  dd->pending_reqs = g_slist_prepend(dd->pending_reqs, req);
 
   g_string_free(content, TRUE);
   g_string_free(request, TRUE);

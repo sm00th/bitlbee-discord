@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "discord-util.h"
+#include <bitlbee/http_client.h>
 
 void discord_debug(char *format, ...)
 {
@@ -84,8 +85,14 @@ void free_gw_data(gw_data *gw)
   }
 }
 
+static void free_pending_req(struct http_request *req)
+{
+  http_close(req);
+}
+
 void free_discord_data(discord_data *dd)
 {
+  g_slist_free_full(dd->pending_reqs, (GDestroyNotify)free_pending_req);
   g_slist_free_full(dd->pchannels, (GDestroyNotify)free_channel_info);
   g_slist_free_full(dd->servers, (GDestroyNotify)free_server_info);
 

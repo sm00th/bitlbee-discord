@@ -446,10 +446,19 @@ static gboolean discord_prepare_message(struct im_connection *ic,
 {
   gboolean posted = FALSE;
   gchar *msg = json_o_strdup(minfo, "content");
+  json_value *jpinned = json_o_get(minfo, "pinned");
+  gboolean pinned = (jpinned != NULL && jpinned->type == json_boolean) ?
+                       jpinned->u.boolean : FALSE;
 
   if (is_edit == TRUE) {
     gchar *epx = set_getstr(&ic->acc->set, "edit_prefix");
     gchar *newmsg = g_strconcat(epx, msg, NULL);
+    g_free(msg);
+    msg = newmsg;
+  }
+
+  if (pinned == TRUE) {
+    gchar *newmsg = g_strconcat("PINNED: ", msg, NULL);
     g_free(msg);
     msg = newmsg;
   }
@@ -533,9 +542,13 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
 
   if (action == ACTION_CREATE) {
     guint64 msgid = g_ascii_strtoull(json_o_str(minfo, "id"), NULL, 10);
-    if (msgid > cinfo->last_msg) {
+    json_value *jpinned = json_o_get(minfo, "pinned");
+    gboolean pinned = (jpinned != NULL && jpinned->type == json_boolean) ?
+                       jpinned->u.boolean : FALSE;
+
+    if ((msgid > cinfo->last_msg) || pinned) {
       gboolean posted = discord_prepare_message(ic, minfo, cinfo, FALSE);
-      if (posted) {
+      if (posted && (msgid > cinfo->last_msg)) {
         if (g_strcmp0(json_o_str(json_o_get(minfo, "author"), "id"), dd->id)) {
           discord_http_send_ack(ic, cinfo->id, json_o_str(minfo, "id"));
         }

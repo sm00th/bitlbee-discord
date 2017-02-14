@@ -49,6 +49,7 @@ static void discord_init(account_t *acc)
   s = set_add(&acc->set, "mention_suffix", ":", NULL, acc);
   s = set_add(&acc->set, "mention_ignorecase", "off", set_eval_bool, acc);
   s = set_add(&acc->set, "incoming_me_translation", "on", set_eval_bool, acc);
+  s = set_add(&acc->set, "fetch_pinned", "off", set_eval_bool, acc);
 
   s = set_add(&acc->set, "max_backlog", "50", set_eval_int, acc);
   s->flags |= ACC_SET_OFFLINE_ONLY;
@@ -134,6 +135,10 @@ static struct groupchat *discord_chat_join(struct im_connection *ic,
 
   cinfo->to.channel.gc = gc;
   gc->data = cinfo;
+
+  if (set_getbool(&ic->acc->set, "fetch_pinned")) {
+    discord_http_get_pinned(ic, cinfo->id);
+  }
 
   if (set_getint(&ic->acc->set, "max_backlog") > 0 &&
       cinfo->last_msg > cinfo->last_read) {

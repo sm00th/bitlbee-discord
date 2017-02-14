@@ -62,6 +62,7 @@ typedef struct _discord_data {
   int      inpa;
   guint64  seq;
   guint    pending_sync;
+  GSList   *pending_reqs;
 } discord_data;
 
 typedef struct _server_info {
