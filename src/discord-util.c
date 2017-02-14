@@ -49,6 +49,7 @@ void free_channel_info(channel_info *cinfo)
   g_free(cinfo->id);
   cinfo->id = NULL;
 
+  g_slist_free_full(cinfo->pinned, (GDestroyNotify)g_free);
   if (cinfo->type != CHANNEL_TEXT) {
     g_free(cinfo->to.handle.name);
   } else {

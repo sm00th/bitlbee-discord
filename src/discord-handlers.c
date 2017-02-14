@@ -450,17 +450,32 @@ static gboolean discord_prepare_message(struct im_connection *ic,
   gboolean pinned = (jpinned != NULL && jpinned->type == json_boolean) ?
                        jpinned->u.boolean : FALSE;
 
-  if (is_edit == TRUE) {
-    gchar *epx = set_getstr(&ic->acc->set, "edit_prefix");
-    gchar *newmsg = g_strconcat(epx, msg, NULL);
-    g_free(msg);
-    msg = newmsg;
-  }
 
   if (pinned == TRUE) {
     gchar *newmsg = g_strconcat("PINNED: ", msg, NULL);
     g_free(msg);
     msg = newmsg;
+
+    if (!g_slist_find_custom(cinfo->pinned, json_o_str(minfo, "id"),
+          (GCompareFunc)g_strcmp0)) {
+      cinfo->pinned = g_slist_prepend(cinfo->pinned,
+                                      json_o_strdup(minfo, "id"));
+    }
+  } else if (is_edit == TRUE) {
+    GSList *link = g_slist_find_custom(cinfo->pinned, json_o_str(minfo, "id"),
+                                      (GCompareFunc)g_strcmp0);
+    if (link) {
+      g_free(link->data);
+      cinfo->pinned = g_slist_delete_link(cinfo->pinned, link);
+      gchar *newmsg = g_strconcat("UNPINNED: ", msg, NULL);
+      g_free(msg);
+      msg = newmsg;
+    } else {
+      gchar *epx = set_getstr(&ic->acc->set, "edit_prefix");
+      gchar *newmsg = g_strconcat(epx, msg, NULL);
+      g_free(msg);
+      msg = newmsg;
+    }
   }
 
   gchar *author = discord_canonize_name(json_o_str(json_o_get(minfo,
@@ -546,7 +561,9 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
     gboolean pinned = (jpinned != NULL && jpinned->type == json_boolean) ?
                        jpinned->u.boolean : FALSE;
 
-    if ((msgid > cinfo->last_msg) || pinned) {
+    if ((msgid > cinfo->last_msg) || (pinned &&
+          !g_slist_find_custom(cinfo->pinned, json_o_str(minfo, "id"),
+          (GCompareFunc)g_strcmp0))) {
       gboolean posted = discord_prepare_message(ic, minfo, cinfo, FALSE);
       if (posted && (msgid > cinfo->last_msg)) {
         if (g_strcmp0(json_o_str(json_o_get(minfo, "author"), "id"), dd->id)) {

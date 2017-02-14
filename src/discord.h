@@ -90,6 +90,7 @@ typedef struct _channel_info {
     } handle;
   } to;
   channel_type         type;
+  GSList *pinned;
 } channel_info;
 
 typedef struct _user_info {
