@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <bitlbee/bitlbee.h>
+#include <bitlbee.h>
 
 void discord_http_send_msg(struct im_connection *ic, const char *id,
                            const char *msg);

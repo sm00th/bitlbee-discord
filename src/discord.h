@@ -17,7 +17,7 @@
 #ifndef __DISCORD_H
 #define __DISCORD_H
 
-#include <bitlbee/bitlbee.h>
+#include <bitlbee.h>
 
 #define DISCORD_HOST "discordapp.com"
 #define DEFAULT_KEEPALIVE_INTERVAL 30000
