@@ -16,7 +16,7 @@
  */
 
 #include <config.h>
-#include <bitlbee/json_util.h>
+#include <json_util.h>
 
 #include "discord-util.h"
 #include "discord-handlers.h"

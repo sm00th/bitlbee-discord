@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "discord-util.h"
-#include <bitlbee/http_client.h>
+#include <http_client.h>
 
 void discord_debug(char *format, ...)
 {

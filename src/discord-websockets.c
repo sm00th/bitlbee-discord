@@ -15,8 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <config.h>
-#include <bitlbee/ssl_client.h>
-#include <bitlbee/events.h>
+#include <ssl_client.h>
+#include <events.h>
 
 #include "discord-websockets.h"
 #include "discord-handlers.h"

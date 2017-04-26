@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "discord.h"
-#include <bitlbee/json.h>
+#include <json.h>
 
 typedef enum {
   ACTION_CREATE,

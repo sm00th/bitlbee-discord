@@ -15,9 +15,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <config.h>
-#include <bitlbee/http_client.h>
-#include <bitlbee/json.h>
-#include <bitlbee/json_util.h>
+#include <http_client.h>
+#include <json.h>
+#include <json_util.h>
 
 #include "discord.h"
 #include "discord-http.h"
