@@ -24,6 +24,7 @@ discord_la_CFLAGS  = \
 discord_la_LDFLAGS = \
 	-module \
 	-avoid-version \
+	-no-undefined \
 	$(GLIB_LIBS)
 
 discord_la_SOURCES = \
