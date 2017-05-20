@@ -16,6 +16,8 @@
  */
 #include "discord-util.h"
 #include <http_client.h>
+#include <stdarg.h>
+#include <inttypes.h>
 
 void discord_debug(char *format, ...)
 {
