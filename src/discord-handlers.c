@@ -236,7 +236,7 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
           if (plen < 0) {
             prefix = g_strdup(sinfo->name);
           } else {
-            prefix = g_strndup(sinfo->name, plen);
+            prefix = discord_utf8_strndup(sinfo->name, plen);
           }
           fullname = g_strconcat(prefix, ".", name, NULL);
         }

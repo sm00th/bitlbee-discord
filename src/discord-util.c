@@ -346,3 +346,12 @@ char *discord_escape_string(const char *msg)
 
   return emsg;
 }
+
+char *discord_utf8_strndup(const char *str, size_t n)
+{
+  if (g_utf8_strlen(str, -1) <= n) {
+    return g_strdup(str);
+  }
+
+  return g_strndup(str, g_utf8_offset_to_pointer(str, n) - str);
+}

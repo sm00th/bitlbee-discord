@@ -42,3 +42,4 @@ void free_gw_data(gw_data *gw);
 char *discord_canonize_name(const char *name);
 char *discord_escape_string(const char *msg);
 void discord_debug(char *format, ...);
+char *discord_utf8_strndup(const char *str, size_t n);
