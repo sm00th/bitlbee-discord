@@ -39,6 +39,14 @@ typedef enum {
   CHANNEL_GROUP_PRIVATE
 } channel_type;
 
+typedef enum {
+  RELATIONSHIP_NONE,
+  RELATIONSHIP_FRIENDS,
+  RELATIONSHIP_UNKNOWN,
+  RELATIONSHIP_REQUEST_RECEIVED,
+  RELATIONSHIP_REQUEST_SENT
+} relationship_type;
+
 typedef struct _gw_data {
   int wss;
   gchar *addr;

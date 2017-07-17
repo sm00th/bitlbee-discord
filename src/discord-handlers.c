@@ -174,6 +174,41 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
   // centralized handling solution.
 }
 
+static void discord_handle_relationship(struct im_connection *ic, json_value *rinfo,
+                                        handler_action action)
+{
+  relationship_type rtype = 0;
+  const char *id = json_o_str(rinfo, "id");
+  json_value *uinfo = json_o_get(rinfo, "user");
+  json_value *tjs = json_o_get(rinfo, "type");
+  bee_user_t *bu = bee_user_by_handle(ic->bee, ic, id);
+
+  if (action == ACTION_CREATE) {
+    rtype = (tjs && tjs->type == json_integer) ? tjs->u.integer : 0;
+
+    if (rtype == RELATIONSHIP_FRIENDS) {
+      if (!bu) {
+        discord_handle_user(ic, uinfo, GLOBAL_SERVER_ID, ACTION_CREATE);
+        bu = bee_user_by_handle(ic->bee, ic, id);
+      }
+
+      if (bu) {
+        bu->data = GINT_TO_POINTER(TRUE);
+      }
+
+    } else if (rtype == RELATIONSHIP_REQUEST_RECEIVED) {
+      // call imcb_ask() here
+    }
+
+  } else if (action == ACTION_DELETE) {
+    // not sure what we're supposed to do here
+    if (bu) {
+      // so just unset the friendship bit
+      bu->data = GINT_TO_POINTER(FALSE);
+    }
+  }
+}
+
 void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
                             const char *server_id, handler_action action)
 {
@@ -699,6 +734,16 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
       }
     }
 
+    json_value *rels = json_o_get(data, "relationships");
+    if (rels != NULL && rels->type == json_array) {
+      for (int relidx = 0; relidx < rels->u.array.length; relidx++) {
+        if (rels->u.array.values[relidx]->type == json_object) {
+          json_value *rinfo = rels->u.array.values[relidx];
+          discord_handle_relationship(ic, rinfo, ACTION_CREATE);
+        }
+      }
+    }
+
     if (set_getint(&ic->acc->set, "max_backlog") > 0) {
       json_value *rs = json_o_get(data, "read_state");
       if (rs != NULL && rs->type == json_array) {
@@ -785,6 +830,12 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
   } else if (g_strcmp0(event, "MESSAGE_UPDATE") == 0) {
     json_value *minfo = json_o_get(js, "d");
     discord_handle_message(ic, minfo, ACTION_UPDATE);
+  } else if (g_strcmp0(event, "RELATIONSHIP_ADD") == 0) {
+    json_value *rinfo = json_o_get(js, "d");
+    discord_handle_relationship(ic, rinfo, ACTION_CREATE);
+  } else if (g_strcmp0(event, "RELATIONSHIP_REMOVE") == 0) {
+    json_value *rinfo = json_o_get(js, "d");
+    discord_handle_relationship(ic, rinfo, ACTION_DELETE);
   } else if (g_strcmp0(event, "TYPING_START") == 0) {
     // Ignoring those for now
   } else if (g_strcmp0(event, "MESSAGE_ACK") == 0) {
