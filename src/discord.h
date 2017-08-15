@@ -60,6 +60,7 @@ typedef struct _discord_data {
   void     *ssl;
   int      sslfd;
   int      inpa;
+  guint    wsid;
   guint64  seq;
   guint    pending_sync;
   GSList   *pending_reqs;

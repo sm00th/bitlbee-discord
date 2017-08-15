@@ -114,12 +114,14 @@ static gboolean discord_ws_writable(gpointer data, int source,
   } else {
     g_print("%s: Unhandled writable callback\n", __func__);
   }
+
+  dd->wsid = 0;
   return FALSE;
 }
 
 static void discord_ws_callback_on_writable(discord_data *dd)
 {
-  b_input_add(dd->sslfd, B_EV_IO_WRITE, discord_ws_writable, dd);
+  dd->wsid = b_input_add(dd->sslfd, B_EV_IO_WRITE, discord_ws_writable, dd);
 }
 
 
@@ -297,6 +299,11 @@ void discord_ws_cleanup(discord_data *dd)
   if (dd->keepalive_loop_id > 0) {
     b_event_remove(dd->keepalive_loop_id);
     dd->keepalive_loop_id = 0;
+  }
+
+  if (dd->wsid > 0) {
+    b_event_remove(dd->wsid);
+    dd->wsid = 0;
   }
 
   if (dd->inpa > 0) {
