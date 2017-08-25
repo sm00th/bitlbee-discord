@@ -68,7 +68,7 @@ static void discord_init(account_t *acc)
   acc->flags |= ACC_FLAG_STATUS_MESSAGE;
 
   // \002 is ^B which is used by IRC to toggle bold
-  help_add_mem(&global.help, "Discord",
+  help_add_mem(&global.help, "discord",
 	       "You need to configure discord channels you would like to join/autojoin. To do that, "
 	       "use bitlbee's \002chat list\002 functionality (\002help chat list\002 and \002help chat add\002):\n"
 	       "\002<trac3r>\002 chat list discord\n"
