@@ -44,7 +44,7 @@ static int discord_ws_send_payload(discord_data *dd, const char *pload,
   guchar mkey[4];
   gchar *mpload;
 
-  discord_debug(">>> (%s) %s %"PRIu64"\n%s\n", dd->uname, __func__, psize, pload);
+  discord_debug(">>> (%s) %s %"G_GUINT64_FORMAT"\n%s\n", dd->uname, __func__, psize, pload);
 
   random_bytes(mkey, sizeof(mkey));
   mpload = discord_ws_mask(mkey, pload, psize);
