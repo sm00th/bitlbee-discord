@@ -1,0 +1,75 @@
+?discord
+You need to configure discord channels you would like to join/autojoin. To do that, use bitlbee's chat list functionality (help chat list and help chat add):
+<trac3r> chat list discord
+This will show you the list of available channel with indexes that can be used for adding channels.
+<trac3r> chat add discord !1 #mydiscordchannel
+<trac3r> chan #mydiscordchannel set auto_join true
+<trac3r> /join #mydiscordchannel
+If you set auto_join to true, next time you reconnect there will be no need to join the channel manually.
+See help discord options for more.
+%
+?discord options
+Various options are available through account set. See help account set for more info. For more help on the the options themselves, use help discord <option>.
+host (default: "discordapp.com")
+voice_status_notify (default: no)
+edit_prefix (default: "EDIT: ")
+urlinfo_handle (default: "urlinfo")
+max_backlog (default: 50)
+send_acks (default: yes)
+mention_suffix (default: ":")
+mention_ignorecase (default: off)
+incoming_me_translation (default: on)
+never_offline (default: off)
+server_prefix_len (default: 3)
+fetch_pinned (default: off)
+%
+?discord host
+host (type: string; default: "discordapp.com")
+Discord server hostname. Just in case discord changes the hostname or there are some alternatives with compatible API.
+%
+?discord voice_status_notify
+voice_status_notify (type: boolean; default: no)
+This enables text notifications in your control channel about users changing/leaving voice channels. Can be noisy on big servers.
+%
+?discord edit_prefix
+edit_prefix (type: string; default: "EDIT: ")
+A string that will be prefixed to an edited message to distinguish those from normal ones.
+%
+?discord urlinfo_handle
+urlinfo_handle (type: string; default: "urlinfo")
+User handle that will be used to post url expansion info such as title and description in groupchats.
+%
+?discord max_backlog
+max_backlog (type: integer; default: 50)
+Maximum number of backlog messages per channel to fetch on connection. Unlike twitter implementation in bitlbee this won't dump seen messages. Setting this to 0 or negative values disables backlog fetching.
+%
+?discord send_acks
+send_acks (type: boolean; default: yes)
+By default bitlbee-discord will send an "ack" for every message received, thus marking everything as "read" on mobile/webapp. Setting this to false will disable all acks from bitlbee-discord.
+%
+?discord mention_suffix
+mention_suffix (type: string; default: ":")
+Suffix used in a regex to look for username mentions to automatically convert your usual irc-style "nick:" mentions to discord's "<@id>" format. So if you type "nick: hello" in bitlbee, it will be displayed as "@nick hello" in discord. This can be multicharacter and you can even do OR logic here because it is actually used as a part of glib regex. That is setting this to "[:,]" will match both "nick:" and "nick,". But beware overcomplicating this may lead to bitlbee-discord spending a lot of time parsing your outgoing messages. Setting this to "" will disable this function.
+%
+?discord mention_ignorecase
+mention_ignorecase (type: boolean; default: off)
+Ignore case when looking for outgoing mentions. This also affects channel mentions.
+%
+?discord incoming_me_translation
+incoming_me_translation (type: boolean; default: on)
+This option controls whether bitlbee-discord will translate incoming messages that are fully italicized (that is enclosed in '*' characters) to '/me' messages.
+%
+?discord never_offline
+never_offline (type: boolean; default: off)
+Contacts from this account will never appear as offline and will be marked away instead.
+%
+?discord server_prefix_len
+server_prefix_len (type: int; default: 3)
+Prefix channel names with this many characters of server name. If set to 0 nothing will be prefixed. If set to anything lower than 0 - full server name will be prefixed. Assuming we have a channel "general" on "beecord" server here is what channel name you are going to get with different settings:
+ -1 - #beecord.general
+  0 - #general
+  3 - #bee.general
+%
+?discord fetch_pinned
+fetch_pinned (type: boolean; default: off)
+Fetch pinned messages on channel join.
