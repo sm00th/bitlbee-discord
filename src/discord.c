@@ -18,6 +18,7 @@
 #include "discord-http.h"
 #include "discord-util.h"
 #include "discord-websockets.h"
+#include "help.h"
 
 #ifdef BITLBEE_ABI_VERSION_CODE
 struct plugin_info *init_plugin_info(void)
@@ -65,6 +66,17 @@ static void discord_init(account_t *acc)
 
   acc->flags |= ACC_FLAG_AWAY_MESSAGE;
   acc->flags |= ACC_FLAG_STATUS_MESSAGE;
+
+  // \002 is ^B which is used by IRC to toggle bold
+  help_add_mem(&global.help, "Discord",
+	       "You need to configure discord channels you would like to join/autojoin. To do that, "
+	       "use bitlbee's \002chat list\002 functionality (\002help chat list\002 and \002help chat add\002):\n"
+	       "\002<trac3r>\002 chat list discord\n"
+	       "This will show you the list of available channel with indexes that can be used for adding channels.\n"
+	       "\002<trac3r>\002 chat add discord !1 #mydiscordchannel\n"
+	       "\002<trac3r>\002 chan #mydiscordchannel set auto_join true\n"
+	       "\002<trac3r>\002 /join #mydiscordchannel\n"
+	       "If you set auto_join to true, next time you reconnect there will be no need to join the channel manually.");
 }
 
 static void discord_login(account_t *acc)
