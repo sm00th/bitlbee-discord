@@ -26,11 +26,11 @@ Build dependencies
 
 - glib2 and headers => 2.32
   The library itself is usually installed as a dependency of bitlbee, headers
-  need to be installed separately. In debian the package containing them is
+  need to be installed separately. In Debian, the package containing them is
   libglib2.0-dev.
 
 - autotools (if building from git)
-  A bit of an overkill, but autotools is a buildsystem of choice now, sorry.
+  A bit of an overkill, but autotools is the build system of choice now, sorry.
 
 
 Building and Installing
@@ -73,7 +73,7 @@ join the channel manually.
 
 Options
 -------
-This section describes options available throug "account set" bitlbee command
+This section describes options available through "account set" bitlbee command
 (for help on usage of this command see "help account set").
 
   - host (type: string; default: "discordapp.com")
@@ -149,7 +149,7 @@ on your screen run bitlbee by hand in foreground mode:
 then connect with an irc client as you usually do.
 
 WARNING: there IS sensitive information in this debug output, such as auth
-tokens, your plaintext password and, obviosly, your incoming and outgoing
+tokens, your plaintext password and, obviously, your incoming and outgoing
 messages. Be sure to remove any information you are not willing to share before
 posting it anywhere.
 
