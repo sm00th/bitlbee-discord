@@ -61,7 +61,7 @@ static int discord_ws_send_payload(discord_data *dd, const char *pload,
 
   buf[0] = 0x81; // Text frame
   if (psize < 126) {
-    buf[1] = (char)psize | 0x80;
+    buf[1] = (gchar)(psize | 0x80);
   } else if (psize > G_MAXUINT16) {
     guint64 esize = GUINT64_TO_BE(psize);
     buf[1] = (gchar)(127 | 0x80);
