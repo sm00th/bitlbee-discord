@@ -44,7 +44,7 @@ static int discord_ws_send_payload(discord_data *dd, const char *pload,
   guchar mkey[4];
   gchar *mpload;
 
-  discord_debug(">>> (%s) %s %"PRIu64"\n%s\n", dd->uname, __func__, psize, pload);
+  discord_debug(">>> (%s) %s %"G_GUINT64_FORMAT"\n%s\n", dd->uname, __func__, psize, pload);
 
   random_bytes(mkey, sizeof(mkey));
   mpload = discord_ws_mask(mkey, pload, psize);
@@ -106,7 +106,7 @@ static gboolean discord_ws_writable(gpointer data, int source,
     if (dd->seq == 0) {
       g_string_printf(buf, "{\"op\":%d,\"d\":null}", OPCODE_HEARTBEAT);
     } else {
-      g_string_printf(buf, "{\"op\":%d,\"d\":%"PRIu64"}", OPCODE_HEARTBEAT,
+      g_string_printf(buf, "{\"op\":%d,\"d\":%"G_GUINT64_FORMAT"}", OPCODE_HEARTBEAT,
                       dd->seq);
     }
     discord_ws_send_payload(dd, buf->str, buf->len);

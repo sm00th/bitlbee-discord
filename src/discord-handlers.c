@@ -614,7 +614,7 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
   discord_data *dd = ic->proto_data;
   json_value *js = json_parse((gchar*)buf, size);
 
-  discord_debug("<<< (%s) %s %"PRIu64"\n%s\n", dd->uname, __func__, size, buf);
+  discord_debug("<<< (%s) %s %"G_GUINT64_FORMAT"\n%s\n", dd->uname, __func__, size, buf);
 
   if (!js || js->type != json_object) {
     imcb_error(ic, "Failed to parse json reply.");
