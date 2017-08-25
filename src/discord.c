@@ -76,7 +76,99 @@ static void discord_init(account_t *acc)
 	       "\002<trac3r>\002 chat add discord !1 #mydiscordchannel\n"
 	       "\002<trac3r>\002 chan #mydiscordchannel set auto_join true\n"
 	       "\002<trac3r>\002 /join #mydiscordchannel\n"
-	       "If you set auto_join to true, next time you reconnect there will be no need to join the channel manually.");
+	       "If you set auto_join to true, next time you reconnect there will be no need to join the channel manually.\n"
+	       "See \002help discord options\002 for more.");
+
+  help_add_mem(&global.help, "discord options",
+	       "Various options are available through \002account set\002. See \002help account set\002 for more info. "
+	       "For more help on the the options themselves, use \002help discord <option>\002.\n"
+	       "\002host\002 (default: \"discordapp.com\")\n"
+	       "\002voice_status_notify\002 (default: no)\n"
+	       "\002edit_prefix\002 (default: \"EDIT: \")\n"
+	       "\002urlinfo_handle\002 (default: \"urlinfo\")\n"
+	       "\002max_backlog\002 (default: 50)\n"
+	       "\002send_acks\002 (default: yes)\n"
+	       "\002mention_suffix\002 (default: \":\")\n"
+	       "\002mention_ignorecase\002 (default: off)\n"
+	       "\002incoming_me_translation\002 (default: on)\n"
+	       "\002never_offline\002 (default: off)\n"
+	       "\002server_prefix_len\002 (default: 3)\n"
+	       "\002fetch_pinned\002 (default: off)\n");
+
+  help_add_mem(&global.help, "discord host",
+	       "host (type: string; default: \"discordapp.com\")\n"
+	       "Discord server hostname. Just in case discord changes the hostname or there "
+	       "are some alternatives with compatible API.");
+
+  help_add_mem(&global.help, "discord voice_status_notify",
+	       "voice_status_notify (type: boolean; default: no)\n"
+	       "This enables text notifications in your control channel about users "
+	       "changing/leaving voice channels. Can be noisy on big servers.");
+
+  help_add_mem(&global.help, "discord edit_prefix",
+	       "edit_prefix (type: string; default: \"EDIT: \")\n"
+	       "A string that will be prefixed to an edited message to distinguish those "
+	       "from normal ones.");
+
+  help_add_mem(&global.help, "discord urlinfo_handle",
+	       "urlinfo_handle (type: string; default: \"urlinfo\")\n"
+	       "User handle that will be used to post url expansion info such as title and "
+	       "description in groupchats.");
+
+  help_add_mem(&global.help, "discord max_backlog",
+	       "max_backlog (type: integer; default: 50)\n"
+	       "Maximum number of backlog messages per channel to fetch on connection. "
+	       "Unlike twitter implementation in bitlbee this won't dump seen messages. "
+	       "Setting this to 0 or negative values disables backlog fetching.");
+
+  help_add_mem(&global.help, "discord send_acks",
+	       "send_acks (type: boolean; default: yes)\n"
+	       "By default bitlbee-discord will send an \"ack\" for every message received, "
+	       "thus marking everything as \"read\" on mobile/webapp. Setting this to false "
+	       "will disable all acks from bitlbee-discord.");
+
+  help_add_mem(&global.help, "discord mention_suffix",
+	       "mention_suffix (type: string; default: \":\")\n"
+	       "Suffix used in a regex to look for username mentions to automatically "
+	       "convert your usual irc-style \"nick:\" mentions to discord's \"<@id>\" format. "
+	       "So if you type \"nick: hello\" in bitlbee, it will be displayed as "
+	       "\"@nick hello\" in discord. This can be multicharacter and you can even do OR "
+	       "logic here because it is actually used as a part of glib regex. That is "
+	       "setting this to \"[:,]\" will match both \"nick:\" and \"nick,\". But beware "
+	       "overcomplicating this may lead to bitlbee-discord spending a lot of time "
+	       "parsing your outgoing messages. Setting this to \"\" will disable this "
+	       "function.");
+
+  help_add_mem(&global.help, "discord mention_ignorecase",
+	       "mention_ignorecase (type: boolean; default: off)\n"
+	       "Ignore case when looking for outgoing mentions. This also affects channel "
+	       "mentions.");
+
+  help_add_mem(&global.help, "discord incoming_me_translation",
+	       "incoming_me_translation (type: boolean; default: on)\n"
+	       "This option controls whether bitlbee-discord will translate incoming "
+	       "messages that are fully italicized (that is enclosed in '*' characters) to "
+	       "'/me' messages.");
+
+  help_add_mem(&global.help, "discord never_offline",
+	       "never_offline (type: boolean; default: off)\n"
+	       "Contacts from this account will never appear as offline and will be marked "
+	       "away instead.");
+
+  help_add_mem(&global.help, "discord server_prefix_len",
+	       "server_prefix_len (type: int; default: 3)\n"
+	       "Prefix channel names with this many characters of server name. If set to 0 "
+	       "nothing will be prefixed. If set to anything lower than 0 - full server "
+	       "name will be prefixed. Assuming we have a channel \"general\" on \"beecord\" "
+	       "server here is what channel name you are going to get with different "
+	       "settings:\n"
+	       " -1 - #beecord.general\n"
+	       "  0 - #general\n"
+	       "  3 - #bee.general");
+
+  help_add_mem(&global.help, "discord fetch_pinned",
+	       "fetch_pinned (type: boolean; default: off)\n"
+	       "Fetch pinned messages on channel join.");
 }
 
 static void discord_login(account_t *acc)
