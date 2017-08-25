@@ -64,11 +64,11 @@ static int discord_ws_send_payload(discord_data *dd, const char *pload,
     buf[1] = (char)psize | 0x80;
   } else if (psize > G_MAXUINT16) {
     guint64 esize = GUINT64_TO_BE(psize);
-    buf[1] = 127 | (char)0x80;
+    buf[1] = (gchar)(127 | 0x80);
     memcpy(buf + 2, &esize, sizeof(esize));
   } else {
     guint16 esize = GUINT16_TO_BE(psize);
-    buf[1] = 126 | (char)0x80;
+    buf[1] = (gchar)(126 | 0x80);
     memcpy(buf + 2, &esize, sizeof(esize));
   }
 
