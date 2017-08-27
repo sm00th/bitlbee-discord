@@ -23,7 +23,7 @@
 static void discord_help_init()
 {
   /* Figure out where our help file is by looking at the global helpfile. */
-  char *s = strstr(global.helpfile, "help.txt");
+  char *s = g_strrstr(global.helpfile, "help.txt");
   if (s == NULL) {
     log_message(LOGLVL_WARNING, "Error finding the original helpfile %s.", global.helpfile);
     return;
