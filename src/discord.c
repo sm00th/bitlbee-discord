@@ -22,6 +22,9 @@
 
 static void discord_help_init()
 {
+  int dlen;
+  gpointer df;
+
   /* Figure out where our help file is by looking at the global helpfile. */
   char *s = g_strrstr(global.helpfile, "help.txt");
   if (s == NULL) {
@@ -30,10 +33,10 @@ static void discord_help_init()
   }
 
   /* Create new filename "discord-help.txt". */
-  int dlen = s - global.helpfile;
-  char *df = g_malloc0(dlen + 17);
+  dlen = s - global.helpfile;
+  df = g_malloc0(dlen + 17);
   strncpy(df, global.helpfile, dlen);
-  strcpy(df + dlen, "discord-help.txt");
+  strncpy(df + dlen, "discord-help.txt", 17);
 
   /* Load help from our own help file and link last entry of global.help with first entry of our help. Each help entry
    * has its own fd. help_free will free us all, in the end. */
@@ -41,6 +44,7 @@ static void discord_help_init()
   help_t *dh;
   if (help_init(&dh, df) == NULL) {
     log_message(LOGLVL_WARNING, "Error opening helpfile %s.", df);
+    return;
   }
 
   help_t *h, *l = NULL;
