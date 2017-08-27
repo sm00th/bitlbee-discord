@@ -20,11 +20,11 @@
 #include "discord-websockets.h"
 #include "help.h"
 
+#define HELPFILE_NAME "discord-help.txt"
+size_t hfnlen = strlen(HELPFILE_NAME) + 1;
+
 static void discord_help_init()
 {
-  int dlen;
-  gpointer df;
-
   /* Figure out where our help file is by looking at the global helpfile. */
   char *s = g_strrstr(global.helpfile, "help.txt");
   if (s == NULL) {
@@ -32,11 +32,11 @@ static void discord_help_init()
     return;
   }
 
-  /* Create new filename "discord-help.txt". */
-  dlen = s - global.helpfile;
-  df = g_malloc0(dlen + 17);
+  /* Create new filename discord-help.txt in the directory of help.txt. */
+  int dlen = s - global.helpfile;
+  gpointer df = g_malloc0(dlen + hfnlen);
   strncpy(df, global.helpfile, dlen);
-  strncpy(df + dlen, "discord-help.txt", 17);
+  strncpy(df + dlen, HELPFILE_NAME, hfnlen);
 
   /* Load help from our own help file and link last entry of global.help with first entry of our help. Each help entry
    * has its own fd. help_free will free us all, in the end. */
