@@ -20,8 +20,6 @@
 #include "discord-websockets.h"
 #include "help.h"
 
-#include <stdlib.h>
-
 static void discord_help_init()
 {
   /* Figure out where our help file is by looking at the global helpfile. */
