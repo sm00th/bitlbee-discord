@@ -65,8 +65,6 @@ static void discord_help_init()
 #ifdef BITLBEE_ABI_VERSION_CODE
 struct plugin_info *init_plugin_info(void)
 {
-  discord_help_init();
-
   static struct plugin_info info = {
     BITLBEE_ABI_VERSION_CODE,
     "bitlbee-discord",
@@ -110,6 +108,8 @@ static void discord_init(account_t *acc)
 
   acc->flags |= ACC_FLAG_AWAY_MESSAGE;
   acc->flags |= ACC_FLAG_STATUS_MESSAGE;
+
+  discord_help_init();
 }
 
 static void discord_login(account_t *acc)
