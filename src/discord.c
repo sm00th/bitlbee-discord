@@ -21,45 +21,40 @@
 #include "help.h"
 
 #define HELPFILE_NAME "discord-help.txt"
-size_t hfnlen = strlen(HELPFILE_NAME) + 1;
+size_t hfnlen = sizeof(HELPFILE_NAME);
 
 static void discord_help_init()
 {
   /* Figure out where our help file is by looking at the global helpfile. */
-  char *s = g_strrstr(global.helpfile, "help.txt");
-  if (s == NULL) {
-    log_message(LOGLVL_WARNING, "Error finding the original helpfile %s.", global.helpfile);
+  gchar *dir = g_path_get_dirname (global.helpfile);
+  if (strcmp(dir, ".") == 0) {
+    log_message(LOGLVL_WARNING, "Error finding the directory of helpfile %s.", global.helpfile);
+    g_free(dir);
     return;
   }
+  gchar *df = g_strjoin("/", dir, HELPFILE_NAME, NULL);
+  g_free(dir);
 
-  /* Create new filename discord-help.txt in the directory of help.txt. */
-  int dlen = s - global.helpfile;
-  gpointer df = g_malloc0(dlen + hfnlen);
-  strncpy(df, global.helpfile, dlen);
-  strncpy(df + dlen, HELPFILE_NAME, hfnlen);
-
-  /* Load help from our own help file and link last entry of global.help with first entry of our help. Each help entry
-   * has its own fd. help_free will free us all, in the end. */
-
+  /* Load help from our own help file. */
   help_t *dh;
-  if (help_init(&dh, df) == NULL) {
+  help_init(&dh, df);
+  g_free(df);
+  if(dh == NULL) {
     log_message(LOGLVL_WARNING, "Error opening helpfile %s.", df);
     return;
   }
 
+  /* Link the last entry of global.help with first entry of our help. */
   help_t *h, *l = NULL;
   for (h = global.help; h; h = h->next) {
     l = h;
   }
-
   if (l) {
     l->next = dh;
   } else {
     /* No global help but ours? */
     global.help = dh;
   }
-
-  g_free(df);
 }
 
 #ifdef BITLBEE_ABI_VERSION_CODE
