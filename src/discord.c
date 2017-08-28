@@ -21,7 +21,6 @@
 #include "help.h"
 
 #define HELPFILE_NAME "discord-help.txt"
-size_t hfnlen = sizeof(HELPFILE_NAME);
 
 static void discord_help_init()
 {
