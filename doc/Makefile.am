@@ -1,4 +1,4 @@
-# Copyright 2016 Artem Savkov <artem.savkov@gmail.com>
+# Copyright 2017 Artem Savkov <artem.savkov@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,6 +13,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-AUTOMAKE_OPTIONS = foreign
-ACLOCAL_AMFLAGS = -Im4
-SUBDIRS = src doc
+EXTRA_DIST = discord-help.txt
+
+install-data-local:
+	if [ -f $(DESTDIR)$(datadir)/help.txt ]; then \
+		for file in $(EXTRA_DIST); do \
+			$(INSTALL) -m 644 $(srcdir)/$$file $(DESTDIR)$(datadir)/; \
+		done \
+	else \
+		echo "Detected dir $(DESTDIR)$(datadir) is not bitlbee's data dir"; \
+		echo "Skipping help install"; \
+	fi
