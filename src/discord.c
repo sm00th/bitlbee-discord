@@ -37,11 +37,12 @@ static void discord_help_init()
   /* Load help from our own help file. */
   help_t *dh;
   help_init(&dh, df);
-  g_free(df);
   if(dh == NULL) {
-    log_message(LOGLVL_WARNING, "Error opening helpfile %s.", df);
+    log_message(LOGLVL_WARNING, "Error opening helpfile: %s.", df);
+    g_free(df);
     return;
   }
+  g_free(df);
 
   /* Link the last entry of global.help with first entry of our help. */
   help_t *h, *l = NULL;
