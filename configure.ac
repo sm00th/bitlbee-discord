@@ -73,5 +73,23 @@ AS_IF(
 
 AC_SUBST([plugindir])
 
-AC_CONFIG_FILES([Makefile src/Makefile])
+AC_ARG_WITH([bdatadir],
+    [AS_HELP_STRING([--with-bdatadir], [BitlBee data directory])],
+    [bdatadir="$with_bdatadir"]
+)
+
+AS_IF(
+    [test -z "$bdatadir"],
+    [PKG_CHECK_VAR(
+        [BITLBEE_DATADIR],
+        [bitlbee],
+        [datadir],
+        [datadir="$BITLBEE_DATADIR"],
+        [datadir="$datarootdir/bitlbee"]
+    )]
+)
+
+AC_SUBST([datadir])
+
+AC_CONFIG_FILES([Makefile src/Makefile doc/Makefile])
 AC_OUTPUT

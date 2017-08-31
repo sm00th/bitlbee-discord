@@ -18,6 +18,44 @@
 #include "discord-http.h"
 #include "discord-util.h"
 #include "discord-websockets.h"
+#include "help.h"
+
+#define HELPFILE_NAME "discord-help.txt"
+
+static void discord_help_init()
+{
+  /* Figure out where our help file is by looking at the global helpfile. */
+  gchar *dir = g_path_get_dirname (global.helpfile);
+  if (strcmp(dir, ".") == 0) {
+    log_message(LOGLVL_WARNING, "Error finding the directory of helpfile %s.", global.helpfile);
+    g_free(dir);
+    return;
+  }
+  gchar *df = g_strjoin("/", dir, HELPFILE_NAME, NULL);
+  g_free(dir);
+
+  /* Load help from our own help file. */
+  help_t *dh;
+  help_init(&dh, df);
+  if(dh == NULL) {
+    log_message(LOGLVL_WARNING, "Error opening helpfile: %s.", df);
+    g_free(df);
+    return;
+  }
+  g_free(df);
+
+  /* Link the last entry of global.help with first entry of our help. */
+  help_t *h, *l = NULL;
+  for (h = global.help; h; h = h->next) {
+    l = h;
+  }
+  if (l) {
+    l->next = dh;
+  } else {
+    /* No global help but ours? */
+    global.help = dh;
+  }
+}
 
 #ifdef BITLBEE_ABI_VERSION_CODE
 struct plugin_info *init_plugin_info(void)
@@ -65,6 +103,8 @@ static void discord_init(account_t *acc)
 
   acc->flags |= ACC_FLAG_AWAY_MESSAGE;
   acc->flags |= ACC_FLAG_STATUS_MESSAGE;
+
+  discord_help_init();
 }
 
 static void discord_login(account_t *acc)
