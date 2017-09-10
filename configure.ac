@@ -86,7 +86,8 @@ AS_IF(
         [datadir],
         [datadir="$BITLBEE_DATADIR"],
         [datadir="$datarootdir/bitlbee"]
-    )]
+    )],
+    [datadir="$bdatadir"]
 )
 
 AC_SUBST([datadir])
