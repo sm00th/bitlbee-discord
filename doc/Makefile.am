@@ -16,11 +16,11 @@
 EXTRA_DIST = discord-help.txt
 
 install-data-local:
-	if [ -f $(DESTDIR)$(datadir)/help.txt ]; then \
+	if [ -f $(datadir)/help.txt ]; then \
 		for file in $(EXTRA_DIST); do \
 			$(INSTALL) -m 644 $(srcdir)/$$file $(DESTDIR)$(datadir)/; \
 		done \
 	else \
-		echo "Detected dir $(DESTDIR)$(datadir) is not bitlbee's data dir"; \
+		echo "Detected dir $(datadir) is not bitlbee's data dir"; \
 		echo "Skipping help install"; \
 	fi
