@@ -18,6 +18,7 @@ EXTRA_DIST = discord-help.txt
 install-data-local:
 	if [ -f $(datadir)/help.txt ]; then \
 		for file in $(EXTRA_DIST); do \
+		  mkdir -p $(DESTDIR)$(datadir); \
 			$(INSTALL) -m 644 $(srcdir)/$$file $(DESTDIR)$(datadir)/; \
 		done \
 	else \
