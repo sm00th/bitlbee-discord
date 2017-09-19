@@ -178,10 +178,10 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
                                         handler_action action)
 {
   relationship_type rtype = 0;
-  const char *id = json_o_str(rinfo, "id");
   json_value *uinfo = json_o_get(rinfo, "user");
   json_value *tjs = json_o_get(rinfo, "type");
-  bee_user_t *bu = bee_user_by_handle(ic->bee, ic, id);
+  char *name = discord_canonize_name(json_o_str(uinfo, "username"));
+  bee_user_t *bu = bee_user_by_handle(ic->bee, ic, name);
 
   if (action == ACTION_CREATE) {
     rtype = (tjs && tjs->type == json_integer) ? tjs->u.integer : 0;
@@ -189,7 +189,7 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
     if (rtype == RELATIONSHIP_FRIENDS) {
       if (!bu) {
         discord_handle_user(ic, uinfo, GLOBAL_SERVER_ID, ACTION_CREATE);
-        bu = bee_user_by_handle(ic->bee, ic, id);
+        bu = bee_user_by_handle(ic->bee, ic, name);
       }
 
       if (bu) {
@@ -207,6 +207,8 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
       bu->data = GINT_TO_POINTER(FALSE);
     }
   }
+
+  g_free(name);
 }
 
 void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
