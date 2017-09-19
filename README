@@ -139,7 +139,7 @@ This section describes options available through "account set" bitlbee command
   - fetch_pinned (type: boolean; default: off)
     Fetch pinned messages on channel join.
 
-  - friendship_mode (default: on)
+  - friendship_mode (type: boolean; default: on)
     With this option, online/offline status is determined by the friendship
     relationship with a user instead of their actual away status, and all users
     are added to channels by default. Takes priority over never_offline.
