@@ -124,7 +124,7 @@ This section describes options available through "account set" bitlbee command
 
   - never_offline (type: boolean; default: off)
     Contacts from this account will never appear as offline and will be marked
-    away instead.
+    away instead. Does nothing if friendship_mode is enabled.
 
   - server_prefix_len (type: int; default: 3)
     Prefix channel names with this many characters of server name. If set to 0
@@ -138,6 +138,11 @@ This section describes options available through "account set" bitlbee command
 
   - fetch_pinned (type: boolean; default: off)
     Fetch pinned messages on channel join.
+
+  - friendship_mode (default: on)
+    With this option, online/offline status is determined by the friendship
+    relationship with a user instead of their actual away status, and all users
+    are added to channels by default. Takes priority over never_offline.
 
 Debugging
 ---------
