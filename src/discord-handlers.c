@@ -402,17 +402,23 @@ static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
 }
 
 static gboolean discord_post_message(channel_info *cinfo, const gchar *author,
-                                 gchar *msg)
+                                 gchar *msg, gboolean is_self)
 {
+  int flags = 0;
+
   if (strlen(msg) == 0) {
     return FALSE;
   }
 
+  if (is_self) {
+    flags |= OPT_SELFMESSAGE;
+  }
+
   if (cinfo->type == CHANNEL_PRIVATE) {
-    imcb_buddy_msg(cinfo->to.handle.ic, author, msg, 0, 0);
+    imcb_buddy_msg(cinfo->to.handle.ic, author, msg, flags, 0);
     return TRUE;
   } else if (cinfo->type == CHANNEL_TEXT && cinfo->to.channel.gc != NULL) {
-    imcb_chat_msg(cinfo->to.channel.gc, author, msg, 0, 0);
+    imcb_chat_msg(cinfo->to.channel.gc, author, msg, flags, 0);
     return TRUE;
   }
   return FALSE;
@@ -444,12 +450,24 @@ static gboolean discord_prepare_message(struct im_connection *ic,
                                     json_value *minfo,
                                     channel_info *cinfo, gboolean is_edit)
 {
+  discord_data *dd = ic->proto_data;
   gboolean posted = FALSE;
   gchar *msg = json_o_strdup(minfo, "content");
   json_value *jpinned = json_o_get(minfo, "pinned");
   gboolean pinned = (jpinned != NULL && jpinned->type == json_boolean) ?
                        jpinned->u.boolean : FALSE;
 
+  gchar *author = discord_canonize_name(json_o_str(json_o_get(minfo,
+                                        "author"), "username"));
+  const char *nonce = json_o_str(minfo, "nonce");
+  gboolean is_self = discord_is_self(ic, author);
+
+  // Don't echo self messages that we sent in this session
+  if (is_self && nonce != NULL && g_strcmp0(nonce, dd->nonce) == 0) {
+    g_free(author);
+    g_free(msg);
+    return FALSE;
+  }
 
   if (pinned == TRUE) {
     gchar *newmsg = g_strconcat("PINNED: ", msg, NULL);
@@ -478,9 +496,6 @@ static gboolean discord_prepare_message(struct im_connection *ic,
     }
   }
 
-  gchar *author = discord_canonize_name(json_o_str(json_o_get(minfo,
-                                        "author"), "username"));
-
   if (set_getbool(&ic->acc->set, "incoming_me_translation") == TRUE &&
       g_regex_match_simple("^[\\*_].*[\\*_]$", msg, 0, 0) == TRUE) {
     GString *tstr = g_string_new(msg);
@@ -494,8 +509,8 @@ static gboolean discord_prepare_message(struct im_connection *ic,
   }
 
   if (cinfo->type == CHANNEL_PRIVATE) {
-    if (g_strcmp0(author, cinfo->to.handle.name) == 0) {
-      posted = discord_post_message(cinfo, cinfo->to.handle.name, msg);
+    if (is_self || g_strcmp0(author, cinfo->to.handle.name) == 0) {
+      posted = discord_post_message(cinfo, author, msg, is_self);
     }
   } else if (cinfo->type == CHANNEL_TEXT) {
     json_value *mentions = json_o_get(minfo, "mentions");
@@ -524,7 +539,7 @@ static gboolean discord_prepare_message(struct im_connection *ic,
                                        ic->proto_data, NULL);
     g_regex_unref(cregex);
 
-    posted = discord_post_message(cinfo, author, fmsg);
+    posted = discord_post_message(cinfo, author, fmsg, is_self);
     g_free(fmsg);
   }
 
@@ -532,7 +547,7 @@ static gboolean discord_prepare_message(struct im_connection *ic,
   if (attachments != NULL && attachments->type == json_array) {
     for (int aidx = 0; aidx < attachments->u.array.length; aidx++) {
       const char *url = json_o_str(attachments->u.array.values[aidx], "url");
-      posted = discord_post_message(cinfo, author, (char *)url);
+      posted = discord_post_message(cinfo, author, (char *)url, is_self);
     }
   }
   g_free(author);
@@ -592,7 +607,7 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
           const char *title = json_o_str(embeds->u.array.values[eidx], "title");
           if (title != NULL) {
             msg = g_strconcat("title: ", title, NULL);
-            discord_post_message(cinfo, author, msg);
+            discord_post_message(cinfo, author, msg, FALSE);
             g_free(msg);
           }
 
@@ -600,7 +615,7 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
                                                "description");
           if (description != NULL) {
             msg = g_strconcat("description: ", description, NULL);
-            discord_post_message(cinfo, author, msg);
+            discord_post_message(cinfo, author, msg, FALSE);
             g_free(msg);
           }
         }

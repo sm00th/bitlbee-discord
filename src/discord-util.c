@@ -100,6 +100,7 @@ void free_discord_data(discord_data *dd)
   g_slist_free_full(dd->servers, (GDestroyNotify)free_server_info);
 
   free_gw_data(dd->gateway);
+  g_free(dd->nonce);
   g_free(dd->token);
   g_free(dd->uname);
   g_free(dd->id);

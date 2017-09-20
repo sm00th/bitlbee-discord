@@ -49,6 +49,7 @@ typedef struct _discord_data {
   char     *token;
   char     *id;
   char     *uname;
+  char     *nonce;
   gw_data  *gateway;
   GSList   *servers;
   GSList   *pchannels;
@@ -100,5 +101,7 @@ typedef struct _user_info {
   channel_info         *voice_channel;
   bee_user_t           *user;
 } user_info;
+
+gboolean discord_is_self(struct im_connection *ic, const char *who);
 
 #endif //__DISCORD_H
