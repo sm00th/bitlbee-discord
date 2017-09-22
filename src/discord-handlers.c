@@ -509,9 +509,7 @@ static gboolean discord_prepare_message(struct im_connection *ic,
   }
 
   if (cinfo->type == CHANNEL_PRIVATE) {
-    if (is_self || g_strcmp0(author, cinfo->to.handle.name) == 0) {
-      posted = discord_post_message(cinfo, cinfo->to.handle.name, msg, is_self);
-    }
+    posted = discord_post_message(cinfo, cinfo->to.handle.name, msg, is_self);
   } else if (cinfo->type == CHANNEL_TEXT) {
     json_value *mentions = json_o_get(minfo, "mentions");
     if (mentions != NULL && mentions->type == json_array) {
