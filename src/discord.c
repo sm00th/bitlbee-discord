@@ -115,6 +115,10 @@ static void discord_login(account_t *acc)
   dd->keepalive_interval = DEFAULT_KEEPALIVE_INTERVAL;
   ic->proto_data = dd;
 
+  guchar nonce_bytes[16];
+  random_bytes(nonce_bytes, sizeof(nonce_bytes));
+  dd->nonce = g_base64_encode(nonce_bytes, sizeof(nonce_bytes));
+
   if (set_getstr(&ic->acc->set,"token_cache")) {
     discord_http_get_gateway(ic, set_getstr(&ic->acc->set,"token_cache"));
   } else {
@@ -214,7 +218,7 @@ static int discord_buddy_msg(struct im_connection *ic, char *to, char *msg,
   return 0;
 }
 
-static gboolean discord_is_self(struct im_connection *ic, const char *who)
+gboolean discord_is_self(struct im_connection *ic, const char *who)
 {
   discord_data *dd = ic->proto_data;
   return !g_strcmp0(dd->uname, who);
