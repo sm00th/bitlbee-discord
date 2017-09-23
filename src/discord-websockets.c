@@ -231,6 +231,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     if (read != len) {
         imcb_error(ic, "Failed to read data.");
         imc_logout(ic, TRUE);
+        g_free(rdata);
         return FALSE;
     }
 
