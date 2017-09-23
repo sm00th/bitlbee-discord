@@ -228,6 +228,13 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
       }
     }
 
+    if (read != len) {
+        imcb_error(ic, "Failed to read data.");
+        imc_logout(ic, TRUE);
+        g_free(rdata);
+        return FALSE;
+    }
+
     if (mask) {
       gchar *mdata = discord_ws_mask(mkey, rdata, len);
       discord_parse_message(ic, mdata, len);
@@ -237,7 +244,14 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     }
     g_free(rdata);
   }
-  return TRUE;
+  if (ssl_pending(dd->ssl)) {
+    /* The SSL library empties the TCP buffers completely but may keep some
+       data in its internal buffers. select() won't see that, but
+       ssl_pending() does. */
+    return discord_ws_in_cb(data, source, cond);
+  } else {
+    return TRUE;
+  }
 }
 
 static gboolean discord_ws_connected_cb(gpointer data, int retcode,
