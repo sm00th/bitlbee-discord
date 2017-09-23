@@ -201,12 +201,18 @@ static void discord_http_login_cb(struct http_request *req)
     char *errmsg = (char*)json_o_str(js, "message");
 
     if (errmsg == NULL) {
+      json_value *em = NULL;
       json_value *email = json_o_get(js, "email");
+      json_value *password = json_o_get(js, "password");
+
       if (email != NULL && email->type == json_array) {
-        json_value *em = email->u.array.values[0];
-        if (em != NULL && em->type == json_string) {
-          errmsg = em->u.string.ptr;
-        }
+        em = email->u.array.values[0];
+      } else if (password != NULL && password->type == json_array) {
+        em = password->u.array.values[0];
+      }
+
+      if (em != NULL && em->type == json_string) {
+        errmsg = em->u.string.ptr;
       }
     }
 
