@@ -231,6 +231,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     if (read != len) {
         imcb_error(ic, "Failed to read data.");
         imc_logout(ic, TRUE);
+        return FALSE;
     }
 
     if (mask) {
@@ -243,7 +244,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     g_free(rdata);
   }
   if (ssl_pending(dd->ssl)) {
-    /* OpenSSL empties the TCP buffers completely but may keep some
+    /* The SSL library empties the TCP buffers completely but may keep some
        data in its internal buffers. select() won't see that, but
        ssl_pending() does. */
     return discord_ws_in_cb(data, source, cond);
