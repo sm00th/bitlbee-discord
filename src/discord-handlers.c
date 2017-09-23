@@ -676,13 +676,17 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
 
     discord_add_global_server(ic);
     json_value *guilds = json_o_get(data, "guilds");
-    if (guilds != NULL && guilds->type == json_array) {
+    if (guilds != NULL && guilds->type == json_array &&
+        guilds->u.array.length > 0) {
       for (int gidx = 0; gidx < guilds->u.array.length; gidx++) {
         if (guilds->u.array.values[gidx]->type == json_object) {
           json_value *ginfo = guilds->u.array.values[gidx];
           discord_handle_server(ic, ginfo, ACTION_CREATE);
         }
       }
+    } else {
+      dd->state = WS_READY;
+      imcb_connected(ic);
     }
 
     json_value *pcs = json_o_get(data, "private_channels");
