@@ -161,7 +161,6 @@ static struct groupchat *discord_chat_join(struct im_connection *ic,
   struct groupchat *gc = NULL;
   server_info *sinfo = NULL;
   channel_info *cinfo = get_channel(dd, room, NULL, SEARCH_FNAME);
-  gboolean friendship_mode = set_getbool(&ic->acc->set, "friendship_mode");
 
   if (cinfo == NULL || cinfo->type != CHANNEL_TEXT) {
     return NULL;
@@ -175,7 +174,7 @@ static struct groupchat *discord_chat_join(struct im_connection *ic,
 
   for (GSList *ul = sinfo->users; ul; ul = g_slist_next(ul)) {
     user_info *uinfo = ul->data;
-    if (uinfo->user->flags & BEE_USER_ONLINE || friendship_mode == TRUE) {
+    if (uinfo->flags & BEE_USER_ONLINE) {
       imcb_chat_add_buddy(gc, uinfo->user->handle);
     }
   }

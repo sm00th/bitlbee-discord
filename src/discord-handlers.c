@@ -84,7 +84,6 @@ static void discord_handle_presence(struct im_connection *ic,
   }
 
   const char *status = json_o_str(pinfo, "status");
-  int flags = 0;
 
   if (uinfo->user->ic != ic ||
       g_strcmp0(uinfo->user->handle, dd->uname) == 0) {
@@ -92,10 +91,12 @@ static void discord_handle_presence(struct im_connection *ic,
   }
 
   if (g_strcmp0(status, "online") == 0) {
-    flags = BEE_USER_ONLINE;
+    uinfo->flags = BEE_USER_ONLINE;
   } else if (g_strcmp0(status, "idle") == 0 ||
              set_getbool(&ic->acc->set, "never_offline") == TRUE) {
-    flags = BEE_USER_ONLINE | BEE_USER_AWAY;
+    uinfo->flags = BEE_USER_ONLINE | BEE_USER_AWAY;
+  } else {
+    uinfo->flags = 0;
   }
 
   for (GSList *cl = sinfo->channels; cl; cl = g_slist_next(cl)) {
@@ -103,7 +104,7 @@ static void discord_handle_presence(struct im_connection *ic,
 
     if (cinfo->type == CHANNEL_TEXT) {
       if (cinfo->to.channel.gc != NULL) {
-        if (flags) {
+        if (uinfo->flags) {
           imcb_chat_add_buddy(cinfo->to.channel.gc, uinfo->user->handle);
         } else {
           imcb_chat_remove_buddy(cinfo->to.channel.gc, uinfo->user->handle,
@@ -113,7 +114,13 @@ static void discord_handle_presence(struct im_connection *ic,
     }
   }
 
-  imcb_buddy_status(ic, uinfo->name, flags, NULL, NULL);
+  bee_user_t *bu = bee_user_by_handle(ic->bee, ic, uinfo->name);
+  if (bu) {
+    if (set_getbool(&ic->acc->set, "friendship_mode") != TRUE ||
+        GPOINTER_TO_INT(bu->data) == TRUE) {
+      imcb_buddy_status(ic, uinfo->name, uinfo->flags, NULL, NULL);
+    }
+  }
 }
 
 static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
@@ -192,14 +199,9 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
         discord_handle_user(ic, uinfo, GLOBAL_SERVER_ID, ACTION_CREATE);
         bu = bee_user_by_handle(ic->bee, ic, name);
       }
-
       if (bu) {
         bu->data = GINT_TO_POINTER(TRUE);
-        if (set_getbool(&ic->acc->set, "friendship_mode") == TRUE) {
-          imcb_buddy_status(ic, name, BEE_USER_ONLINE, NULL, NULL);
-        }
       }
-
     } else if (rtype == RELATIONSHIP_REQUEST_RECEIVED) {
       // call imcb_ask() here
     }
@@ -406,8 +408,7 @@ static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
     }
 
     json_value *presences = json_o_get(sinfo, "presences");
-    if (presences != NULL && presences->type == json_array &&
-        set_getbool(&ic->acc->set, "friendship_mode") == FALSE) {
+    if (presences != NULL && presences->type == json_array) {
       for (int pidx = 0; pidx < presences->u.array.length; pidx++) {
         json_value *pinfo = presences->u.array.values[pidx];
         discord_handle_presence(ic, pinfo, sdata->id);
@@ -788,8 +789,7 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
     }
 
     json_value *presences = json_o_get(data, "presences");
-    if (presences != NULL && presences->type == json_array &&
-        set_getbool(&ic->acc->set, "friendship_mode") == FALSE) {
+    if (presences != NULL && presences->type == json_array) {
       for (int pidx = 0; pidx < presences->u.array.length; pidx++) {
         json_value *pinfo = presences->u.array.values[pidx];
         discord_handle_presence(ic, pinfo, id);
@@ -804,8 +804,7 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
   } else if (g_strcmp0(event, "VOICE_STATE_UPDATE") == 0) {
     json_value *vsinfo = json_o_get(js, "d");
     discord_handle_voice_state(ic, vsinfo, json_o_str(vsinfo, "guild_id"));
-  } else if (g_strcmp0(event, "PRESENCE_UPDATE") == 0 &&
-             set_getbool(&ic->acc->set, "friendship_mode") == FALSE) {
+  } else if (g_strcmp0(event, "PRESENCE_UPDATE") == 0) {
     json_value *pinfo = json_o_get(js, "d");
     discord_handle_presence(ic, pinfo, json_o_str(pinfo, "guild_id"));
   } else if (g_strcmp0(event, "CHANNEL_CREATE") == 0) {

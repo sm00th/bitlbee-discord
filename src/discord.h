@@ -108,6 +108,7 @@ typedef struct _user_info {
   char                 *name;
   channel_info         *voice_channel;
   bee_user_t           *user;
+  guint32               flags;
 } user_info;
 
 gboolean discord_is_self(struct im_connection *ic, const char *who);
