@@ -22,6 +22,7 @@ Various options are available through account set. See help account set for 
 never_offline (default: off)
 server_prefix_len (default: 3)
 fetch_pinned (default: off)
+friendship_mode (default: on)
 %
 ?discord host
 host (type: string; default: "discordapp.com")
@@ -73,3 +74,7 @@ Prefix channel names with this many characters of server name. If set to 0 nothi
 ?discord fetch_pinned
 fetch_pinned (type: boolean; default: off)
 Fetch pinned messages on channel join.
+%
+?friendship_mode
+friendship_mode (type: boolean; default: on)
+With this option enabled, online/offline status is determined by the friendship relationship with a user in addition to their actual away status, and other users are added to channels.

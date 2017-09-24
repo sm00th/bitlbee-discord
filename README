@@ -124,7 +124,7 @@ This section describes options available through "account set" bitlbee command
 
   - never_offline (type: boolean; default: off)
     Contacts from this account will never appear as offline and will be marked
-    away instead. Does nothing if friendship_mode is enabled.
+    away instead.
 
   - server_prefix_len (type: int; default: 3)
     Prefix channel names with this many characters of server name. If set to 0
@@ -140,16 +140,16 @@ This section describes options available through "account set" bitlbee command
     Fetch pinned messages on channel join.
 
   - friendship_mode (type: boolean; default: on)
-    With this option, online/offline status is determined by the friendship
-    relationship with a user instead of their actual away status, and all users
-    are added to channels by default. Takes priority over never_offline.
+    With this option enabled, online/offline status is determined by the
+    friendship relationship with a user in addition to their actual away
+    status, and other users are added to channels.
 
 Debugging
 ---------
 You can enable extra debug output for bitlbee-discord, by setting BITLBEE_DEBUG
 environment variable. This will enable bitlbee-discord to print all traffic it
 exchanges with discord servers to stdout and there is a lot of it. To get it
-on your screen run bitlbee by hand in foreground mode: 
+on your screen run bitlbee by hand in foreground mode:
   $ BITLBEE_DEBUG=1 bitlbee -nvD
 then connect with an irc client as you usually do.
 
