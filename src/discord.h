@@ -39,6 +39,14 @@ typedef enum {
   CHANNEL_GROUP_PRIVATE
 } channel_type;
 
+typedef enum {
+  RELATIONSHIP_NONE,
+  RELATIONSHIP_FRIENDS,
+  RELATIONSHIP_UNKNOWN,
+  RELATIONSHIP_REQUEST_RECEIVED,
+  RELATIONSHIP_REQUEST_SENT
+} relationship_type;
+
 typedef struct _gw_data {
   int wss;
   gchar *addr;
@@ -100,6 +108,7 @@ typedef struct _user_info {
   char                 *name;
   channel_info         *voice_channel;
   bee_user_t           *user;
+  guint32               flags;
 } user_info;
 
 gboolean discord_is_self(struct im_connection *ic, const char *who);

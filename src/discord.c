@@ -101,6 +101,9 @@ static void discord_init(account_t *acc)
   s = set_add(&acc->set, "token_cache", NULL, NULL, acc);
   s->flags |= SET_HIDDEN | SET_NULL_OK;
 
+  s = set_add(&acc->set, "friendship_mode", "on", set_eval_bool, acc);
+  s->flags |= ACC_SET_OFFLINE_ONLY;
+
   acc->flags |= ACC_FLAG_AWAY_MESSAGE;
   acc->flags |= ACC_FLAG_STATUS_MESSAGE;
 
@@ -171,7 +174,7 @@ static struct groupchat *discord_chat_join(struct im_connection *ic,
 
   for (GSList *ul = sinfo->users; ul; ul = g_slist_next(ul)) {
     user_info *uinfo = ul->data;
-    if (uinfo->user->flags & BEE_USER_ONLINE) {
+    if (uinfo->flags & BEE_USER_ONLINE) {
       imcb_chat_add_buddy(gc, uinfo->user->handle);
     }
   }

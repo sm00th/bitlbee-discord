@@ -84,7 +84,6 @@ static void discord_handle_presence(struct im_connection *ic,
   }
 
   const char *status = json_o_str(pinfo, "status");
-  int flags = 0;
 
   if (uinfo->user->ic != ic ||
       g_strcmp0(uinfo->user->handle, dd->uname) == 0) {
@@ -92,10 +91,12 @@ static void discord_handle_presence(struct im_connection *ic,
   }
 
   if (g_strcmp0(status, "online") == 0) {
-    flags = BEE_USER_ONLINE;
+    uinfo->flags = BEE_USER_ONLINE;
   } else if (g_strcmp0(status, "idle") == 0 ||
              set_getbool(&ic->acc->set, "never_offline") == TRUE) {
-    flags = BEE_USER_ONLINE | BEE_USER_AWAY;
+    uinfo->flags = BEE_USER_ONLINE | BEE_USER_AWAY;
+  } else {
+    uinfo->flags = 0;
   }
 
   for (GSList *cl = sinfo->channels; cl; cl = g_slist_next(cl)) {
@@ -103,7 +104,7 @@ static void discord_handle_presence(struct im_connection *ic,
 
     if (cinfo->type == CHANNEL_TEXT) {
       if (cinfo->to.channel.gc != NULL) {
-        if (flags) {
+        if (uinfo->flags) {
           imcb_chat_add_buddy(cinfo->to.channel.gc, uinfo->user->handle);
         } else {
           imcb_chat_remove_buddy(cinfo->to.channel.gc, uinfo->user->handle,
@@ -113,7 +114,13 @@ static void discord_handle_presence(struct im_connection *ic,
     }
   }
 
-  imcb_buddy_status(ic, uinfo->name, flags, NULL, NULL);
+  bee_user_t *bu = bee_user_by_handle(ic->bee, ic, uinfo->name);
+  if (bu) {
+    if (set_getbool(&ic->acc->set, "friendship_mode") != TRUE ||
+        GPOINTER_TO_INT(bu->data) == TRUE) {
+      imcb_buddy_status(ic, uinfo->name, uinfo->flags, NULL, NULL);
+    }
+  }
 }
 
 static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
@@ -132,14 +139,17 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
 
   if (action == ACTION_CREATE) {
     if (name) {
+      guint32 flags = 0;
       user_info *ui = NULL;
       bee_user_t *bu = bee_user_by_handle(ic->bee, ic, name);
 
       if (bu == NULL) {
         imcb_add_buddy(ic, name, NULL);
         if (set_getbool(&ic->acc->set, "never_offline") == TRUE) {
-          imcb_buddy_status(ic, name, BEE_USER_ONLINE | BEE_USER_AWAY, NULL,
-                            NULL);
+          flags = BEE_USER_ONLINE | BEE_USER_AWAY;
+          if (set_getbool(&ic->acc->set, "friendship_mode") == FALSE) {
+            imcb_buddy_status(ic, name, flags, NULL, NULL);
+          }
         } else {
           imcb_buddy_status(ic, name, 0, NULL, NULL);
         }
@@ -151,6 +161,7 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
         ui->user = bu;
         ui->id = g_strdup(id);
         ui->name = g_strdup(name);
+        ui->flags = flags;
 
         sinfo->users = g_slist_prepend(sinfo->users, ui);
       }
@@ -172,6 +183,47 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
   g_free(name);
   // XXX: Should warn about unhandled action _UPDATE if we switch to some
   // centralized handling solution.
+}
+
+static void discord_handle_relationship(struct im_connection *ic, json_value *rinfo,
+                                        handler_action action)
+{
+  discord_data *dd = ic->proto_data;
+  relationship_type rtype = 0;
+  json_value *uinfo = json_o_get(rinfo, "user");
+  json_value *tjs = json_o_get(rinfo, "type");
+  char *name = discord_canonize_name(json_o_str(uinfo, "username"));
+  bee_user_t *bu = bee_user_by_handle(ic->bee, ic, name);
+
+  if (action == ACTION_CREATE) {
+    rtype = (tjs && tjs->type == json_integer) ? tjs->u.integer : 0;
+
+    if (rtype == RELATIONSHIP_FRIENDS) {
+      if (!bu) {
+        discord_handle_user(ic, uinfo, GLOBAL_SERVER_ID, ACTION_CREATE);
+        bu = bee_user_by_handle(ic->bee, ic, name);
+      }
+      if (bu) {
+        bu->data = GINT_TO_POINTER(TRUE);
+        if (set_getbool(&ic->acc->set, "friendship_mode") == TRUE) {
+          user_info *uinfo = get_user(dd, name, NULL, SEARCH_NAME);
+          imcb_buddy_status(ic, name, uinfo->flags, NULL, NULL);
+        }
+      }
+    } else if (rtype == RELATIONSHIP_REQUEST_RECEIVED) {
+      // call imcb_ask() here
+    }
+
+  } else if (action == ACTION_DELETE) {
+    if (bu) {
+      bu->data = GINT_TO_POINTER(FALSE);
+      if (set_getbool(&ic->acc->set, "friendship_mode") == TRUE) {
+        imcb_buddy_status(ic, name, 0, NULL, NULL);
+      }
+    }
+  }
+
+  g_free(name);
 }
 
 void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
@@ -699,6 +751,16 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
       }
     }
 
+    json_value *rels = json_o_get(data, "relationships");
+    if (rels != NULL && rels->type == json_array) {
+      for (int relidx = 0; relidx < rels->u.array.length; relidx++) {
+        if (rels->u.array.values[relidx]->type == json_object) {
+          json_value *rinfo = rels->u.array.values[relidx];
+          discord_handle_relationship(ic, rinfo, ACTION_CREATE);
+        }
+      }
+    }
+
     if (set_getint(&ic->acc->set, "max_backlog") > 0) {
       json_value *rs = json_o_get(data, "read_state");
       if (rs != NULL && rs->type == json_array) {
@@ -785,6 +847,12 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
   } else if (g_strcmp0(event, "MESSAGE_UPDATE") == 0) {
     json_value *minfo = json_o_get(js, "d");
     discord_handle_message(ic, minfo, ACTION_UPDATE);
+  } else if (g_strcmp0(event, "RELATIONSHIP_ADD") == 0) {
+    json_value *rinfo = json_o_get(js, "d");
+    discord_handle_relationship(ic, rinfo, ACTION_CREATE);
+  } else if (g_strcmp0(event, "RELATIONSHIP_REMOVE") == 0) {
+    json_value *rinfo = json_o_get(js, "d");
+    discord_handle_relationship(ic, rinfo, ACTION_DELETE);
   } else if (g_strcmp0(event, "TYPING_START") == 0) {
     // Ignoring those for now
   } else if (g_strcmp0(event, "MESSAGE_ACK") == 0) {
