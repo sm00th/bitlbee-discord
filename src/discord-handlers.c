@@ -139,15 +139,17 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
 
   if (action == ACTION_CREATE) {
     if (name) {
+      guint32 flags = 0;
       user_info *ui = NULL;
       bee_user_t *bu = bee_user_by_handle(ic->bee, ic, name);
 
       if (bu == NULL) {
         imcb_add_buddy(ic, name, NULL);
-        if (set_getbool(&ic->acc->set, "never_offline") == TRUE &&
-            set_getbool(&ic->acc->set, "friendship_mode") == FALSE) {
-          imcb_buddy_status(ic, name, BEE_USER_ONLINE | BEE_USER_AWAY, NULL,
-                            NULL);
+        if (set_getbool(&ic->acc->set, "never_offline") == TRUE) {
+          flags = BEE_USER_ONLINE | BEE_USER_AWAY;
+          if (set_getbool(&ic->acc->set, "friendship_mode") == FALSE) {
+            imcb_buddy_status(ic, name, flags, NULL, NULL);
+          }
         } else {
           imcb_buddy_status(ic, name, 0, NULL, NULL);
         }
@@ -159,6 +161,7 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
         ui->user = bu;
         ui->id = g_strdup(id);
         ui->name = g_strdup(name);
+        ui->flags = flags;
 
         sinfo->users = g_slist_prepend(sinfo->users, ui);
       }
@@ -185,6 +188,7 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
 static void discord_handle_relationship(struct im_connection *ic, json_value *rinfo,
                                         handler_action action)
 {
+  discord_data *dd = ic->proto_data;
   relationship_type rtype = 0;
   json_value *uinfo = json_o_get(rinfo, "user");
   json_value *tjs = json_o_get(rinfo, "type");
@@ -201,6 +205,10 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
       }
       if (bu) {
         bu->data = GINT_TO_POINTER(TRUE);
+        if (set_getbool(&ic->acc->set, "friendship_mode") == TRUE) {
+          user_info *uinfo = get_user(dd, name, NULL, SEARCH_NAME);
+          imcb_buddy_status(ic, name, uinfo->flags, NULL, NULL);
+        }
       }
     } else if (rtype == RELATIONSHIP_REQUEST_RECEIVED) {
       // call imcb_ask() here
