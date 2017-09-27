@@ -583,6 +583,13 @@ static gboolean discord_prepare_message(struct im_connection *ic,
       }
     }
 
+    // Replace custom emoji with code and a URL
+    GRegex *emoji_regex = g_regex_new("<(:[^:]+:)(\\d+)>", 0, 0, NULL);
+    gchar *emoji_msg = g_regex_replace(emoji_regex, msg, -1, 0, "\\1 https://cdn.discordapp.com/emojis/\\2.png", 0, NULL);
+    g_free(msg);
+    msg = emoji_msg;
+    g_regex_unref(emoji_regex);
+    
     GRegex *cregex = g_regex_new("<#(\\d+)>", 0, 0, NULL);
     gchar *fmsg = g_regex_replace_eval(cregex, msg, -1, 0, 0,
                                        discord_replace_channel,
