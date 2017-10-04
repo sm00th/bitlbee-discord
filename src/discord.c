@@ -189,7 +189,6 @@ static struct groupchat *discord_chat_join(struct im_connection *ic,
 
   if (set_getint(&ic->acc->set, "max_backlog") > 0 &&
       cinfo->last_msg > cinfo->last_read) {
-    cinfo->last_msg = cinfo->last_read;
     discord_http_get_backlog(ic, cinfo->id);
   }
 

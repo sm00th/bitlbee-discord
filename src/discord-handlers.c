@@ -633,16 +633,20 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
     gboolean pinned = (jpinned != NULL && jpinned->type == json_boolean) ?
                        jpinned->u.boolean : FALSE;
 
-    if ((msgid > cinfo->last_msg) || (pinned &&
+    if ((msgid > cinfo->last_read) || (pinned &&
           !g_slist_find_custom(cinfo->pinned, json_o_str(minfo, "id"),
           (GCompareFunc)g_strcmp0))) {
       gboolean posted = discord_prepare_message(ic, minfo, cinfo, FALSE);
-      if (posted && (msgid > cinfo->last_msg)) {
+      if (posted) {
         if (g_strcmp0(json_o_str(json_o_get(minfo, "author"), "id"), dd->id)) {
           discord_http_send_ack(ic, cinfo->id, json_o_str(minfo, "id"));
         }
-        cinfo->last_msg = msgid;
-        cinfo->last_read = msgid;
+        if (msgid > cinfo->last_read) {
+          cinfo->last_read = msgid;
+        }
+        if (msgid > cinfo->last_msg) {
+          cinfo->last_msg = msgid;
+        }
       }
     }
   } else if (action == ACTION_UPDATE) {
