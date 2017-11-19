@@ -866,6 +866,10 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
     discord_handle_relationship(ic, rinfo, ACTION_DELETE);
   } else if (g_strcmp0(event, "TYPING_START") == 0) {
     // Ignoring those for now
+  } else if (g_strcmp0(event, "USER_UPDATE") == 0) {
+    // Ignoring those for now
+  } else if (g_strcmp0(event, "USER_SETTINGS_UPDATE") == 0) {
+    // Ignoring those for now
   } else if (g_strcmp0(event, "MESSAGE_ACK") == 0) {
     // Ignoring those for now
   } else if (g_strcmp0(event, "MESSAGE_DELETE") == 0) {
@@ -876,11 +880,23 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
     // Ignoring those for now
   } else if (g_strcmp0(event, "GUILD_MEMBER_UPDATE") == 0) {
     // Ignoring those for now
+  } else if (g_strcmp0(event, "GUILD_ROLE_DELETE") == 0) {
+    // Ignoring those for now
+  } else if (g_strcmp0(event, "GUILD_ROLE_CREATE") == 0) {
+    // Ignoring those for now
+  } else if (g_strcmp0(event, "GUILD_BAN_ADD") == 0) {
+    // Ignoring those for now
   } else if (g_strcmp0(event, "GUILD_EMOJIS_UPDATE") == 0) {
     // Ignoring those for now
   } else if (g_strcmp0(event, "GUILD_INTEGRATIONS_UPDATE") == 0) {
     // Ignoring those for now
   } else if (g_strcmp0(event, "WEBHOOKS_UPDATE") == 0) {
+    // Ignoring those for now
+  } else if (g_strcmp0(event, "PRESENCES_REPLACE") == 0) {
+    // Ignoring those for now
+  } else if (g_strcmp0(event, "CHANNEL_PINS_ACK") == 0) {
+    // Ignoring those for now
+  } else if (g_strcmp0(event, "CHANNEL_PINS_UPDATE") == 0) {
     // Ignoring those for now
   } else {
     g_print("%s: unhandled event: %s\n", __func__, event);
