@@ -721,8 +721,16 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
 
     dd->keepalive_loop_id = b_timeout_add(dd->keepalive_interval,
                                           discord_ws_keepalive_loop, ic);
+  } else if (op == OPCODE_HEARTBEAT) {
+    discord_ws_keepalive_loop(ic, 0, 0);
   } else if (op == OPCODE_HEARTBEAT_ACK) {
     // heartbeat ack
+  } else if (op == OPCODE_RECONNECT) {
+    imcb_error(ic, "Reconnect requested");
+    imc_logout(ic, TRUE);
+  } else if (op == OPCODE_INVALID_SESSION) {
+    imcb_error(ic, "Invalid session, reconnecting");
+    imc_logout(ic, TRUE);
   } else if (g_strcmp0(event, "READY") == 0) {
     dd->state = WS_ALMOST_READY;
     json_value *data = json_o_get(js, "d");
