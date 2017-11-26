@@ -726,7 +726,7 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
   } else if (op == OPCODE_HEARTBEAT_ACK) {
     // heartbeat ack
   } else if (op == OPCODE_RECONNECT) {
-    imcb_error(ic, "Reconnect requested");
+    imcb_log(ic, "Reconnect requested");
     imc_logout(ic, TRUE);
   } else if (op == OPCODE_INVALID_SESSION) {
     imcb_error(ic, "Invalid session, reconnecting");
