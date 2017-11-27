@@ -180,9 +180,6 @@ static struct groupchat *discord_chat_join(struct im_connection *ic,
     cinfo->to.channel.gc = gc;
   } else if (cinfo != NULL && cinfo->type == CHANNEL_GROUP_PRIVATE) {
     gc = imcb_chat_new(ic, cinfo->to.group.name);
-    if (cinfo->to.group.bci->topic != NULL) {
-      imcb_chat_topic(gc, "root", cinfo->to.group.bci->topic, 0);
-    }
 
     for (GSList *ul = cinfo->to.group.users; ul; ul = g_slist_next(ul)) {
       user_info *uinfo = ul->data;

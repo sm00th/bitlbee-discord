@@ -415,10 +415,6 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
         if (g_strcmp0(topic, cdata->to.channel.gc->topic) != 0) {
           imcb_chat_topic(cdata->to.channel.gc, "root", (char*)topic, 0);
         }
-      } else if (cdata->type == CHANNEL_GROUP_PRIVATE && cdata->to.group.gc != NULL) {
-        if (g_strcmp0(topic, cdata->to.group.gc->topic) != 0) {
-          imcb_chat_topic(cdata->to.group.gc, "root", (char*)topic, 0);
-        }
       }
     }
   }
