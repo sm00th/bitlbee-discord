@@ -374,12 +374,12 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
 
 static void discord_add_global_server(struct im_connection *ic) {
   discord_data *dd = ic->proto_data;
-    server_info *sinfo = g_new0(server_info, 1);
+  server_info *sinfo = g_new0(server_info, 1);
 
-    sinfo->name = g_strdup("_global");
-    sinfo->id = g_strdup(GLOBAL_SERVER_ID);
-    sinfo->ic = ic;
-    dd->servers = g_slist_prepend(dd->servers, sinfo);
+  sinfo->name = g_strdup("_global");
+  sinfo->id = g_strdup(GLOBAL_SERVER_ID);
+  sinfo->ic = ic;
+  dd->servers = g_slist_prepend(dd->servers, sinfo);
 }
 
 static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
