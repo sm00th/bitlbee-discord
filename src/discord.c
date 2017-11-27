@@ -162,25 +162,38 @@ static struct groupchat *discord_chat_join(struct im_connection *ic,
   server_info *sinfo = NULL;
   channel_info *cinfo = get_channel(dd, room, NULL, SEARCH_FNAME);
 
-  if (cinfo == NULL || cinfo->type != CHANNEL_TEXT) {
-    return NULL;
-  }
+  if (cinfo != NULL && cinfo->type == CHANNEL_TEXT) {
+    sinfo = cinfo->to.channel.sinfo;
+    gc = imcb_chat_new(ic, cinfo->to.channel.name);
+    if (cinfo->to.channel.bci->topic != NULL) {
+      imcb_chat_topic(gc, "root", cinfo->to.channel.bci->topic, 0);
+    }
 
-  sinfo = cinfo->to.channel.sinfo;
-  gc = imcb_chat_new(ic, cinfo->to.channel.name);
-  if (cinfo->to.channel.bci->topic != NULL) {
-    imcb_chat_topic(gc, "root", cinfo->to.channel.bci->topic, 0);
-  }
+    for (GSList *ul = sinfo->users; ul; ul = g_slist_next(ul)) {
+      user_info *uinfo = ul->data;
+      if (uinfo->flags & BEE_USER_ONLINE) {
+        imcb_chat_add_buddy(gc, uinfo->user->handle);
+      }
+    }
+    imcb_chat_add_buddy(gc, dd->uname);
 
-  for (GSList *ul = sinfo->users; ul; ul = g_slist_next(ul)) {
-    user_info *uinfo = ul->data;
-    if (uinfo->flags & BEE_USER_ONLINE) {
+    cinfo->to.channel.gc = gc;
+  } else if (cinfo != NULL && cinfo->type == CHANNEL_GROUP_PRIVATE) {
+    gc = imcb_chat_new(ic, cinfo->to.group.name);
+    if (cinfo->to.group.bci->topic != NULL) {
+      imcb_chat_topic(gc, "root", cinfo->to.group.bci->topic, 0);
+    }
+
+    for (GSList *ul = cinfo->to.group.users; ul; ul = g_slist_next(ul)) {
+      user_info *uinfo = ul->data;
       imcb_chat_add_buddy(gc, uinfo->user->handle);
     }
-  }
-  imcb_chat_add_buddy(gc, dd->uname);
+    imcb_chat_add_buddy(gc, dd->uname);
 
-  cinfo->to.channel.gc = gc;
+    cinfo->to.group.gc = gc;
+  } else {
+    return NULL;
+  }
   gc->data = cinfo;
 
   if (set_getbool(&ic->acc->set, "fetch_pinned")) {

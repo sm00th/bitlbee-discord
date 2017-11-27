@@ -98,6 +98,13 @@ typedef struct _channel_info {
       char                 *name;
       struct im_connection *ic;
     } handle;
+    struct {
+      struct groupchat     *gc;
+      char                 *name;
+      bee_chat_info_t      *bci;
+      GSList               *users;
+      struct im_connection *ic;
+    } group;
   } to;
   channel_type         type;
   GSList *pinned;

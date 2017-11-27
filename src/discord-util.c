@@ -52,16 +52,29 @@ void free_channel_info(channel_info *cinfo)
   cinfo->id = NULL;
 
   g_slist_free_full(cinfo->pinned, (GDestroyNotify)g_free);
-  if (cinfo->type != CHANNEL_TEXT) {
-    g_free(cinfo->to.handle.name);
-  } else {
-    if (cinfo->to.channel.gc != NULL) {
-      imcb_chat_free(cinfo->to.channel.gc);
-    }
-    g_free(cinfo->to.channel.name);
-    g_free(cinfo->to.channel.bci->title);
-    g_free(cinfo->to.channel.bci->topic);
-    g_free(cinfo->to.channel.bci);
+  switch (cinfo->type) {
+    case CHANNEL_TEXT:
+      if (cinfo->to.channel.gc != NULL) {
+        imcb_chat_free(cinfo->to.channel.gc);
+      }
+      g_free(cinfo->to.channel.name);
+      g_free(cinfo->to.channel.bci->title);
+      g_free(cinfo->to.channel.bci->topic);
+      g_free(cinfo->to.channel.bci);
+      break;
+    case CHANNEL_GROUP_PRIVATE:
+      if (cinfo->to.group.gc != NULL) {
+        imcb_chat_free(cinfo->to.group.gc);
+      }
+      g_free(cinfo->to.group.name);
+      g_free(cinfo->to.group.bci->title);
+      g_free(cinfo->to.group.bci->topic);
+      g_free(cinfo->to.group.bci);
+      g_slist_free(cinfo->to.group.users);
+      break;
+    default:
+      g_free(cinfo->to.handle.name);
+      break;
   }
 
   g_free(cinfo);
@@ -118,6 +131,8 @@ static gint cmp_chan_name(const channel_info *cinfo, const char *cname)
   gchar *ciname = NULL;
   if (cinfo->type == CHANNEL_TEXT) {
     ciname = cinfo->to.channel.name;
+  } else if (cinfo->type == CHANNEL_GROUP_PRIVATE) {
+    ciname = cinfo->to.group.name;
   } else {
     ciname = cinfo->to.handle.name;
   }
@@ -130,6 +145,8 @@ static gint cmp_chan_fname(const channel_info *cinfo, const char *cname)
   gchar *ciname = NULL;
   if (cinfo->type == CHANNEL_TEXT) {
     ciname = cinfo->to.channel.bci->title;
+  } else if (cinfo->type == CHANNEL_GROUP_PRIVATE) {
+    ciname = cinfo->to.group.bci->title;
   }
 
   return g_strcmp0(ciname, cname);
@@ -141,6 +158,8 @@ static gint cmp_chan_name_ignorecase(const channel_info *cinfo,
   gchar *cfn1 = NULL;
   if (cinfo->type == CHANNEL_TEXT) {
     cfn1 = g_utf8_casefold(cinfo->to.channel.name, -1);
+  } else if (cinfo->type == CHANNEL_GROUP_PRIVATE) {
+    cfn1 = g_utf8_casefold(cinfo->to.group.name, -1);
   } else {
     cfn1 = g_utf8_casefold(cinfo->to.handle.name, -1);
   }
