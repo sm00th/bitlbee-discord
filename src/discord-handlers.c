@@ -721,8 +721,16 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
 
     dd->keepalive_loop_id = b_timeout_add(dd->keepalive_interval,
                                           discord_ws_keepalive_loop, ic);
+  } else if (op == OPCODE_HEARTBEAT) {
+    discord_ws_keepalive_loop(ic, 0, 0);
   } else if (op == OPCODE_HEARTBEAT_ACK) {
     // heartbeat ack
+  } else if (op == OPCODE_RECONNECT) {
+    imcb_log(ic, "Reconnect requested");
+    imc_logout(ic, TRUE);
+  } else if (op == OPCODE_INVALID_SESSION) {
+    imcb_error(ic, "Invalid session, reconnecting");
+    imc_logout(ic, TRUE);
   } else if (g_strcmp0(event, "READY") == 0) {
     dd->state = WS_ALMOST_READY;
     json_value *data = json_o_get(js, "d");
@@ -866,6 +874,10 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
     discord_handle_relationship(ic, rinfo, ACTION_DELETE);
   } else if (g_strcmp0(event, "TYPING_START") == 0) {
     // Ignoring those for now
+  } else if (g_strcmp0(event, "USER_UPDATE") == 0) {
+    // Ignoring those for now
+  } else if (g_strcmp0(event, "USER_SETTINGS_UPDATE") == 0) {
+    // Ignoring those for now
   } else if (g_strcmp0(event, "MESSAGE_ACK") == 0) {
     // Ignoring those for now
   } else if (g_strcmp0(event, "MESSAGE_DELETE") == 0) {
@@ -876,11 +888,23 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
     // Ignoring those for now
   } else if (g_strcmp0(event, "GUILD_MEMBER_UPDATE") == 0) {
     // Ignoring those for now
+  } else if (g_strcmp0(event, "GUILD_ROLE_DELETE") == 0) {
+    // Ignoring those for now
+  } else if (g_strcmp0(event, "GUILD_ROLE_CREATE") == 0) {
+    // Ignoring those for now
+  } else if (g_strcmp0(event, "GUILD_BAN_ADD") == 0) {
+    // Ignoring those for now
   } else if (g_strcmp0(event, "GUILD_EMOJIS_UPDATE") == 0) {
     // Ignoring those for now
   } else if (g_strcmp0(event, "GUILD_INTEGRATIONS_UPDATE") == 0) {
     // Ignoring those for now
   } else if (g_strcmp0(event, "WEBHOOKS_UPDATE") == 0) {
+    // Ignoring those for now
+  } else if (g_strcmp0(event, "PRESENCES_REPLACE") == 0) {
+    // Ignoring those for now
+  } else if (g_strcmp0(event, "CHANNEL_PINS_ACK") == 0) {
+    // Ignoring those for now
+  } else if (g_strcmp0(event, "CHANNEL_PINS_UPDATE") == 0) {
     // Ignoring those for now
   } else {
     g_print("%s: unhandled event: %s\n", __func__, event);
