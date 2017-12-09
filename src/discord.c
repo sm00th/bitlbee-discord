@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include "config.h"
 #include "discord.h"
 #include "discord-http.h"
 #include "discord-util.h"
@@ -63,7 +64,7 @@ struct plugin_info *init_plugin_info(void)
   static struct plugin_info info = {
     BITLBEE_ABI_VERSION_CODE,
     "bitlbee-discord",
-    "0.3.1",
+    PACKAGE_VERSION,
     "Bitlbee plugin for discordapp.com",
     "Artem Savkov <artem.savkov@gmail.com>",
     "https://github.com/sm00th/bitlbee-discord"

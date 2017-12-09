@@ -15,7 +15,7 @@
 
 AC_INIT(
   [bitlbee-discord],
-  [0.1.0],
+  [0.4.0],
   [https://github.com/sm00th/bitlbee-discord/issues],
   [bitlbee-discord],
   [https://github.com/sm00th/bitlbee-discord],
