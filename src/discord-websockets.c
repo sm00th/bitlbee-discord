@@ -341,11 +341,11 @@ void discord_ws_set_status(discord_data *dd, gboolean idle, gchar *message)
   }
 
   if (idle == TRUE) {
-    g_string_printf(buf, "{\"op\":%d,\"d\":{\"idle_since\":%tu,\"game\":{\"name\":\"%s\"}}}", OPCODE_STATUS_UPDATE, time(NULL), msg);
+    g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":%tu,\"game\":{\"name\":\"%s\",\"type\":0},\"afk\":true,\"status\":\"idle\"}}", OPCODE_STATUS_UPDATE, time(NULL)*1000, msg);
   } else if (message != NULL) {
-    g_string_printf(buf, "{\"op\":%d,\"d\":{\"idle_since\":null,\"game\":{\"name\":\"%s\"}}}", OPCODE_STATUS_UPDATE, msg);
+    g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":{\"name\":\"%s\",\"type\":0},\"afk\":false,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE, msg);
   } else {
-    g_string_printf(buf, "{\"op\":%d,\"d\":{\"idle_since\":null,\"game\":{\"name\":null}}}", OPCODE_STATUS_UPDATE);
+    g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":null,\"afk\":false,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE);
   }
   discord_ws_send_payload(dd, buf->str, buf->len);
   g_string_free(buf, TRUE);
