@@ -35,11 +35,22 @@ typedef struct _mstr_data {
   char *sid;
 } mstr_data;
 
-static void discord_http_get(struct im_connection *ic, const char *api_path,
+static void _discord_http_get(struct im_connection *ic, char *request,
                              http_input_function cb_func, gpointer data)
 {
   discord_data *dd = ic->proto_data;
   struct http_request *req;
+
+  req = http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
+                       request, cb_func, data);
+
+  dd->pending_reqs = g_slist_prepend(dd->pending_reqs, req);
+}
+
+static void discord_http_get(struct im_connection *ic, const char *api_path,
+                             http_input_function cb_func, gpointer data)
+{
+  discord_data *dd = ic->proto_data;
   GString *request = g_string_new("");
   g_string_printf(request, "GET /api/%s HTTP/1.1\r\n"
                   "Host: %s\r\n"
@@ -51,11 +62,7 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
                   dd->token);
 
   discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
-
-  req = http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
-                       request->str, cb_func, data);
-
-  dd->pending_reqs = g_slist_prepend(dd->pending_reqs, req);
+  _discord_http_get(ic, request->str, cb_func, data);
   g_string_free(request, TRUE);
 }
 
@@ -458,11 +465,7 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
 
   discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
-  struct http_request *req;
-
-  req = http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
-                                  request->str, discord_http_send_msg_cb, ic);
-  dd->pending_reqs = g_slist_prepend(dd->pending_reqs, req);
+  _discord_http_get(ic, request->str, discord_http_send_msg_cb, ic);
 
   g_string_free(content, TRUE);
   g_string_free(request, TRUE);
@@ -491,12 +494,7 @@ void discord_http_send_ack(struct im_connection *ic, const char *channel_id,
 
   discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
-  struct http_request *req;
-
-  req = http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
-                                   request->str, discord_http_noop_cb,
-                                   dd);
-  dd->pending_reqs = g_slist_prepend(dd->pending_reqs, req);
+  _discord_http_get(ic, request->str, discord_http_noop_cb, dd);
 
   g_string_free(request, TRUE);
 }
@@ -522,12 +520,8 @@ void discord_http_mfa_auth(struct im_connection *ic, const char *msg)
                   auth->str);
 
   discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
-  struct http_request *req;
 
-  req = http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
-                                   request->str, discord_http_mfa_cb,
-                                   ic);
-  dd->pending_reqs = g_slist_prepend(dd->pending_reqs, req);
+  _discord_http_get(ic, request->str, discord_http_mfa_cb, ic);
 
   g_string_free(auth, TRUE);
   g_string_free(request, TRUE);
@@ -556,12 +550,7 @@ void discord_http_login(account_t *acc)
 
   discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
-  struct http_request *req;
-
-  req = http_dorequest(set_getstr(&acc->set, "host"), 443, 1,
-                                   request->str, discord_http_login_cb,
-                                   acc->ic);
-  dd->pending_reqs = g_slist_prepend(dd->pending_reqs, req);
+  _discord_http_get(acc->ic, request->str, discord_http_login_cb, acc->ic);
 
   g_free(epass);
   g_string_free(jlogin, TRUE);
@@ -632,11 +621,7 @@ void discord_http_create_and_send_msg(struct im_connection *ic,
 
   discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
 
-  struct http_request *req;
-
-  req = http_dorequest(set_getstr(&ic->acc->set, "host"), 443, 1,
-                                   request->str, discord_http_casm_cb, cd);
-  dd->pending_reqs = g_slist_prepend(dd->pending_reqs, req);
+  _discord_http_get(ic, request->str, discord_http_casm_cb, cd);
 
   g_string_free(content, TRUE);
   g_string_free(request, TRUE);
