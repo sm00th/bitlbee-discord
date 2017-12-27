@@ -35,6 +35,14 @@ typedef struct _mstr_data {
   char *sid;
 } mstr_data;
 
+typedef struct _retry_req {
+  char *request;
+  struct im_connection *ic;
+  http_input_function func;
+  gpointer data;
+  gint evid;
+} retry_req;
+
 static void _discord_http_get(struct im_connection *ic, char *request,
                              http_input_function cb_func, gpointer data)
 {
@@ -64,6 +72,58 @@ static void discord_http_get(struct im_connection *ic, const char *api_path,
   discord_debug(">>> (%s) %s %lu", dd->uname, __func__, request->len);
   _discord_http_get(ic, request->str, cb_func, data);
   g_string_free(request, TRUE);
+}
+
+static gboolean discord_http_retry(retry_req *rreq, gint fd,
+                                   b_input_condition cond)
+{
+  struct im_connection *ic = rreq->ic;
+  discord_data *dd = ic->proto_data;
+
+  _discord_http_get(ic, rreq->request, rreq->func, rreq->data);
+
+  dd->pending_events = g_slist_remove(dd->pending_events,
+                                     GINT_TO_POINTER(rreq->evid));
+  g_free(rreq->request);
+  g_free(rreq);
+
+  return FALSE;
+}
+
+static int discord_http_check_retry(struct http_request *req)
+{
+  struct im_connection *ic = req->data;
+  discord_data *dd = ic->proto_data;
+
+  if (req->status_code == 429) {
+    json_value *js = json_parse(req->reply_body, req->body_size);
+    if (!js || js->type != json_object) {
+      imcb_error(ic, "Error while parsing ratelimit message");
+      json_value_free(js);
+      return 0;
+    }
+
+    json_value *retry = json_o_get(js, "retry_after");
+    guint32 timeout = (retry && retry->type == json_integer) ? retry->u.integer : 0;
+    retry_req *rreq = g_new0(retry_req, 1);
+    rreq->request = g_strdup(req->request);
+    rreq->ic = ic;
+    rreq->func = req->func;
+    rreq->data = req->data;
+
+    gint evid = b_timeout_add(timeout, (b_event_handler)discord_http_retry,
+                              rreq);
+    rreq->evid = evid;
+
+    dd->pending_events = g_slist_prepend(dd->pending_events,
+                                         GINT_TO_POINTER(evid));
+    discord_debug("(%s) %s [%d] retry scheduled in %u", dd->uname, __func__,
+                  evid, timeout);
+
+    json_value_free(js);
+    return 1;
+  }
+  return 0;
 }
 
 static void discord_http_gateway_cb(struct http_request *req)
@@ -130,8 +190,10 @@ static void discord_http_gateway_cb(struct http_request *req)
 
     json_value_free(js);
   } else {
-    imcb_error(ic, "Failed to get info about self.");
-    imc_logout(ic, TRUE);
+    if (discord_http_check_retry(req) == 0) {
+      imcb_error(ic, "Failed to get info about self.");
+      imc_logout(ic, TRUE);
+    }
   }
 }
 
@@ -168,8 +230,10 @@ static void discord_http_mfa_cb(struct http_request *req)
     g_free(dd->token);
     discord_http_get_gateway(ic, json_o_str(js, "token"));
   } else {
-    imcb_error(ic, "MFA Error: %s", (char*)json_o_str(js, "message"));
-    imc_logout(ic, TRUE);
+    if (discord_http_check_retry(req) == 0) {
+      imcb_error(ic, "MFA Error: %s", (char*)json_o_str(js, "message"));
+      imc_logout(ic, TRUE);
+    }
   }
   json_value_free(js);
 }
@@ -205,26 +269,28 @@ static void discord_http_login_cb(struct http_request *req)
       discord_http_get_gateway(ic, json_o_str(js, "token"));
     }
   } else {
-    char *errmsg = (char*)json_o_str(js, "message");
+    if (discord_http_check_retry(req) == 0) {
+      char *errmsg = (char*)json_o_str(js, "message");
 
-    if (errmsg == NULL) {
-      json_value *em = NULL;
-      json_value *email = json_o_get(js, "email");
-      json_value *password = json_o_get(js, "password");
+      if (errmsg == NULL) {
+        json_value *em = NULL;
+        json_value *email = json_o_get(js, "email");
+        json_value *password = json_o_get(js, "password");
 
-      if (email != NULL && email->type == json_array) {
-        em = email->u.array.values[0];
-      } else if (password != NULL && password->type == json_array) {
-        em = password->u.array.values[0];
+        if (email != NULL && email->type == json_array) {
+          em = email->u.array.values[0];
+        } else if (password != NULL && password->type == json_array) {
+          em = password->u.array.values[0];
+        }
+
+        if (em != NULL && em->type == json_string) {
+          errmsg = em->u.string.ptr;
+        }
       }
 
-      if (em != NULL && em->type == json_string) {
-        errmsg = em->u.string.ptr;
-      }
+      imcb_error(ic, "Login error: %s", errmsg);
+      imc_logout(ic, TRUE);
     }
-
-    imcb_error(ic, "Login error: %s", errmsg);
-    imc_logout(ic, TRUE);
   }
   json_value_free(js);
 }
@@ -247,7 +313,9 @@ static void discord_http_send_msg_cb(struct http_request *req)
                 req->status_code, req->body_size, req->reply_body);
 
   if (req->status_code != 200) {
-    imcb_error(ic, "Failed to send message (%d).", req->status_code);
+    if (discord_http_check_retry(req) == 0) {
+      imcb_error(ic, "Failed to send message (%d).", req->status_code);
+    }
   }
 }
 
@@ -262,7 +330,9 @@ static void discord_http_backlog_cb(struct http_request *req)
                 req->status_code, req->body_size, req->reply_body);
 
   if (req->status_code != 200) {
-    imcb_error(ic, "Failed to get backlog (%d).", req->status_code);
+    if (discord_http_check_retry(req) == 0) {
+      imcb_error(ic, "Failed to get backlog (%d).", req->status_code);
+    }
   } else {
     json_value *messages = json_parse(req->reply_body, req->body_size);
     if (!messages || messages->type != json_array) {
@@ -304,7 +374,9 @@ static void discord_http_pinned_cb(struct http_request *req)
                 req->status_code, req->body_size, req->reply_body);
 
   if (req->status_code != 200) {
-    imcb_error(ic, "Failed to get pinned messages (%d).", req->status_code);
+    if (discord_http_check_retry(req) == 0) {
+      imcb_error(ic, "Failed to get pinned messages (%d).", req->status_code);
+    }
   } else {
     json_value *messages = json_parse(req->reply_body, req->body_size);
     if (!messages || messages->type != json_array) {
@@ -564,8 +636,10 @@ static void discord_http_casm_cb(struct http_request *req)
   discord_data *dd = ic->proto_data;
   dd->pending_reqs = g_slist_remove(dd->pending_reqs, req);
   if (req->status_code != 200) {
-    imcb_error(ic, "Failed to create private channel (%d).",
-               req->status_code);
+    if (discord_http_check_retry(req) == 0) {
+      imcb_error(ic, "Failed to create private channel (%d).",
+                 req->status_code);
+    }
     goto out;
   }
 

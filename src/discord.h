@@ -73,6 +73,7 @@ typedef struct _discord_data {
   guint64  seq;
   guint    pending_sync;
   GSList   *pending_reqs;
+  GSList   *pending_events;
 } discord_data;
 
 typedef struct _server_info {
