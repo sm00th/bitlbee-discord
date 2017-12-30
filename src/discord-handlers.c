@@ -740,7 +740,7 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
   }
 }
 
-void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
+void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size, gboolean *disconnected)
 {
   discord_data *dd = ic->proto_data;
   json_value *js = json_parse((gchar*)buf, size);
@@ -750,6 +750,7 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
   if (!js || js->type != json_object) {
     imcb_error(ic, "Failed to parse json reply.");
     imc_logout(ic, TRUE);
+    *disconnected = TRUE;
     goto exit;
   }
 
@@ -783,9 +784,11 @@ void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
   } else if (op == OPCODE_RECONNECT) {
     imcb_log(ic, "Reconnect requested");
     imc_logout(ic, TRUE);
+    *disconnected = TRUE;
   } else if (op == OPCODE_INVALID_SESSION) {
     imcb_error(ic, "Invalid session, reconnecting");
     imc_logout(ic, TRUE);
+    *disconnected = TRUE;
   } else if (g_strcmp0(event, "READY") == 0) {
     dd->state = WS_ALMOST_READY;
     json_value *data = json_o_get(js, "d");
