@@ -162,6 +162,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     guchar mkey[4] = {0};
     gpointer rdata = NULL;
     guint64 read = 0;
+    gboolean disconnected;
 
     if (ssl_read(dd->ssl, &buf, 1) < 1) {
       imcb_error(ic, "Failed to read data.");
@@ -237,12 +238,14 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
 
     if (mask) {
       gchar *mdata = discord_ws_mask(mkey, rdata, len);
-      discord_parse_message(ic, mdata, len);
+      disconnected = discord_parse_message(ic, mdata, len);
       g_free(mdata);
     } else {
-      discord_parse_message(ic, rdata, len);
+      disconnected = discord_parse_message(ic, rdata, len);
     }
     g_free(rdata);
+    if (disconnected)
+      return FALSE;
   }
   if (ssl_pending(dd->ssl)) {
     /* The SSL library empties the TCP buffers completely but may keep some
