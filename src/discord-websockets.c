@@ -143,8 +143,6 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
   struct im_connection *ic = (struct im_connection *)data;
   discord_data *dd = ic->proto_data;
 
-  gboolean disconnected = FALSE;
-
   if (dd->state == WS_CONNECTING) {
     gchar buf[4096] = "";
     ssl_read(dd->ssl, buf, sizeof(buf));
@@ -164,6 +162,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     guchar mkey[4] = {0};
     gpointer rdata = NULL;
     guint64 read = 0;
+    gboolean disconnected;
 
     if (ssl_read(dd->ssl, &buf, 1) < 1) {
       imcb_error(ic, "Failed to read data.");
@@ -239,14 +238,16 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
 
     if (mask) {
       gchar *mdata = discord_ws_mask(mkey, rdata, len);
-      discord_parse_message(ic, mdata, len, &disconnected);
+      disconnected = discord_parse_message(ic, mdata, len);
       g_free(mdata);
     } else {
-      discord_parse_message(ic, rdata, len, &disconnected);
+      disconnected = discord_parse_message(ic, rdata, len);
     }
     g_free(rdata);
+    if (disconnected)
+      return FALSE;
   }
-  if (!disconnected && ssl_pending(dd->ssl)) {
+  if (ssl_pending(dd->ssl)) {
     /* The SSL library empties the TCP buffers completely but may keep some
        data in its internal buffers. select() won't see that, but
        ssl_pending() does. */

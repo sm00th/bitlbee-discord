@@ -27,4 +27,5 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
                             handler_action action);
 void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
                             const char *server_id, handler_action action);
-void discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size, gboolean *disconnected);
+/* Returns TRUE if it called iwc_logout() */
+gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size);
