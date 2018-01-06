@@ -270,6 +270,10 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
           dd->pchannels = g_slist_prepend(dd->pchannels, ci);
           discord_handle_user(ic, rcp, sinfo ? sinfo->id : GLOBAL_SERVER_ID,
                               ACTION_CREATE);
+          if (set_getint(&ic->acc->set, "max_backlog") > 0 &&
+              ci->last_msg > ci->last_read) {
+            discord_http_get_backlog(ic, ci->id);
+          }
         } else {
           g_print("Failed to get recepient for private channel.\n");
           free_channel_info(ci);
