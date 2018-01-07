@@ -93,7 +93,8 @@ void discord_ws_sync_server(discord_data *dd, const char *id)
 static gboolean discord_ws_writable(gpointer data, int source,
                                     b_input_condition cond)
 {
-  discord_data *dd = (discord_data*)data;
+  struct im_connection *ic = data;
+  discord_data *dd = ic->proto_data;
   if (dd->state == WS_CONNECTED) {
     GString *buf = g_string_new("");
     g_string_printf(buf, "{\"d\":{\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"},\"compress\":false,\"large_threshold\":250,\"synced_guilds\":[]},\"op\":%d}", dd->token, OPCODE_IDENTIFY);
@@ -112,16 +113,17 @@ static gboolean discord_ws_writable(gpointer data, int source,
     discord_ws_send_payload(dd, buf->str, buf->len);
     g_string_free(buf, TRUE);
   } else {
-    g_print("%s: Unhandled writable callback\n", __func__);
+    imcb_error(ic, "Unhandled writable callback.");
   }
 
   dd->wsid = 0;
   return FALSE;
 }
 
-static void discord_ws_callback_on_writable(discord_data *dd)
+static void discord_ws_callback_on_writable(struct im_connection *ic)
 {
-  dd->wsid = b_input_add(dd->sslfd, B_EV_IO_WRITE, discord_ws_writable, dd);
+  discord_data *dd = ic->proto_data;
+  dd->wsid = b_input_add(dd->sslfd, B_EV_IO_WRITE, discord_ws_writable, ic);
 }
 
 
@@ -132,7 +134,7 @@ gboolean discord_ws_keepalive_loop(gpointer data, gint fd,
   discord_data *dd = ic->proto_data;
 
   if (dd->state == WS_READY) {
-    discord_ws_callback_on_writable(dd);
+    discord_ws_callback_on_writable(ic);
   }
   return TRUE;
 }
@@ -149,7 +151,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     if (g_strrstr_len(buf, 25, "101 Switching") != NULL && \
         g_str_has_suffix(buf, "\r\n\r\n")) {
       dd->state = WS_CONNECTED;
-      discord_ws_callback_on_writable(dd);
+      discord_ws_callback_on_writable(ic);
     } else {
       imcb_error(ic, "Failed to switch to websocket mode");
       imc_logout(ic, TRUE);

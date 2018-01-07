@@ -275,7 +275,7 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
             discord_http_get_backlog(ic, ci->id);
           }
         } else {
-          g_print("Failed to get recepient for private channel.\n");
+          imcb_error(ic, "Failed to get recepient for private channel.");
           free_channel_info(ci);
         }
         break;
@@ -373,7 +373,7 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
 
           dd->pchannels = g_slist_prepend(dd->pchannels, ci);
         } else {
-          g_print("Failed to get recepients for private channel.\n");
+          imcb_error(ic, "Failed to get recepients for private channel.");
           free_channel_info(ci);
         }
 
@@ -970,8 +970,8 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
   } else if (g_strcmp0(event, "CHANNEL_PINS_UPDATE") == 0) {
     // Ignoring those for now
   } else {
-    g_print("%s: unhandled event: %s\n", __func__, event);
-    g_print("%s\n", buf);
+    discord_debug("(%s) %s: unhandled event: %s\n%s\n", dd->uname, __func__,
+                  event, buf);
   }
 
 exit:
