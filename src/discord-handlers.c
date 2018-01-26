@@ -226,6 +226,32 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
   g_free(name);
 }
 
+static void discord_channel_auto_join(struct im_connection *ic,
+                                      const char *room)
+{
+  if (!set_getbool(&ic->acc->set, "auto_join")) {
+    return;
+  }
+
+  char *exclude_str = set_getstr(&ic->acc->set, "auto_join_exclude");
+  gchar **exclude_list = g_strsplit(exclude_str, ",", 0);
+  gboolean excluded = FALSE;
+
+  for (int i = 0; !excluded && exclude_list[i]; i++) {
+    char *excl = g_strstrip(g_strdup(exclude_list[i]));
+    if (*excl && g_pattern_match_simple(excl, room)) {
+      excluded = TRUE;
+    }
+    g_free(excl);
+  }
+
+  g_strfreev(exclude_list);
+
+  if (!excluded) {
+    discord_chat_do_join(ic, room, TRUE);
+  }
+}
+
 void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
                             const char *server_id, handler_action action)
 {
@@ -326,6 +352,9 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
         }
 
         sinfo->channels = g_slist_prepend(sinfo->channels, ci);
+
+        discord_channel_auto_join(ic, bci->title);
+
         break;
       }
       case CHANNEL_GROUP_PRIVATE:
@@ -376,6 +405,8 @@ void discord_handle_channel(struct im_connection *ic, json_value *cinfo,
           imcb_error(ic, "Failed to get recepients for private channel.");
           free_channel_info(ci);
         }
+
+        discord_channel_auto_join(ic, bci->title);
 
         break;
       }

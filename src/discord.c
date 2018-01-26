@@ -89,6 +89,8 @@ static void discord_init(account_t *acc)
   s = set_add(&acc->set, "mention_ignorecase", "off", set_eval_bool, acc);
   s = set_add(&acc->set, "incoming_me_translation", "on", set_eval_bool, acc);
   s = set_add(&acc->set, "fetch_pinned", "off", set_eval_bool, acc);
+  s = set_add(&acc->set, "auto_join", "off", set_eval_bool, acc);
+  s = set_add(&acc->set, "auto_join_exclude", "", NULL, acc);
 
   s = set_add(&acc->set, "max_backlog", "50", set_eval_int, acc);
   s->flags |= ACC_SET_OFFLINE_ONLY;
@@ -157,6 +159,14 @@ static struct groupchat *discord_chat_join(struct im_connection *ic,
                                            const char *nick,
                                            const char *password,
                                            set_t **sets)
+
+{
+  return discord_chat_do_join(ic, room, FALSE);
+}
+
+struct groupchat *discord_chat_do_join(struct im_connection *ic,
+                                       const char *room,
+                                       gboolean is_auto_join)
 {
   discord_data *dd = ic->proto_data;
   struct groupchat *gc = NULL;
@@ -166,6 +176,11 @@ static struct groupchat *discord_chat_join(struct im_connection *ic,
   if (cinfo != NULL && cinfo->type == CHANNEL_TEXT) {
     sinfo = cinfo->to.channel.sinfo;
     gc = imcb_chat_new(ic, cinfo->to.channel.name);
+
+    if (is_auto_join) {
+      imcb_chat_name_hint(gc, room);
+    }
+
     if (cinfo->to.channel.bci->topic != NULL) {
       imcb_chat_topic(gc, "root", cinfo->to.channel.bci->topic, 0);
     }
@@ -181,6 +196,10 @@ static struct groupchat *discord_chat_join(struct im_connection *ic,
     cinfo->to.channel.gc = gc;
   } else if (cinfo != NULL && cinfo->type == CHANNEL_GROUP_PRIVATE) {
     gc = imcb_chat_new(ic, cinfo->to.group.name);
+
+    if (is_auto_join) {
+      imcb_chat_name_hint(gc, room);
+    }
 
     for (GSList *ul = cinfo->to.group.users; ul; ul = g_slist_next(ul)) {
       user_info *uinfo = ul->data;
