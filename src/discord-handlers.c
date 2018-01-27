@@ -237,12 +237,12 @@ static void discord_channel_auto_join(struct im_connection *ic,
   gchar **exclude_list = g_strsplit(exclude_str, ",", 0);
   gboolean excluded = FALSE;
 
-  for (int i = 0; !excluded && exclude_list[i]; i++) {
-    char *excl = g_strstrip(g_strdup(exclude_list[i]));
-    if (*excl && g_pattern_match_simple(excl, room)) {
+  for (int i = 0; !excluded && exclude_list[i] != NULL; i++) {
+    char *pattern = g_strstrip(g_strdup(exclude_list[i]));
+    if (strlen(pattern) > 0 && g_pattern_match_simple(pattern, room)) {
       excluded = TRUE;
     }
-    g_free(excl);
+    g_free(pattern);
   }
 
   g_strfreev(exclude_list);
