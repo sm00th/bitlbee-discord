@@ -121,4 +121,8 @@ typedef struct _user_info {
 
 gboolean discord_is_self(struct im_connection *ic, const char *who);
 
+struct groupchat *discord_chat_do_join(struct im_connection *ic,
+                                       const char *name,
+                                       gboolean is_auto_join);
+
 #endif //__DISCORD_H

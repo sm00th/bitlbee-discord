@@ -5,7 +5,9 @@ This will show you the list of available channel with indexes that can be used f
 <trac3r> chat add discord !1 #mydiscordchannel
 <trac3r> chan #mydiscordchannel set auto_join true
 <trac3r> /join #mydiscordchannel
-If you set auto_join to true, next time you reconnect there will be no need to join the channel manually.
+If you set auto_join to true, next time you reconnect there will be no need to join the channel manually.
+Alternatively, you may set the auto_join setting on the account itself (account discord set auto_join on) to automatically join all of the server's channels.
+You can exclude channels from auto-joining using the auto_join_exclude setting.
 See help discord options for more.
 %
 ?discord options
@@ -23,6 +25,8 @@ Various options are available through account set. See help account set for 
 server_prefix_len (default: 3)
 fetch_pinned (default: off)
 friendship_mode (default: on)
+auto_join (default: off)
+auto_join_exclude (default: "")
 %
 ?discord host
 host (type: string; default: "discordapp.com")
@@ -78,3 +82,14 @@ Fetch pinned messages on channel join.
 ?friendship_mode
 friendship_mode (type: boolean; default: on)
 With this option enabled, online/offline status is determined by the friendship relationship with a user in addition to their actual away status, and other users are added to channels.
+%
+?discord auto_join
+auto_join (type: boolean; default: off)
+Automatically join all of the server's channels so you don't have to add them manually (no "chat add" needed).
+%
+?discord auto_join_exclude
+auto_join_exclude (type: string; default: "")
+Comma-separated list of channel patterns to exclude when auto-joining channels.
+* matches any text,  ? matches a single character.
+For instance, "Foo.*,Bar.A" will exclude all channels from server "Foo" and channel "A" from server "Bar".
+%
