@@ -89,8 +89,12 @@ static void discord_init(account_t *acc)
   s = set_add(&acc->set, "mention_ignorecase", "off", set_eval_bool, acc);
   s = set_add(&acc->set, "incoming_me_translation", "on", set_eval_bool, acc);
   s = set_add(&acc->set, "fetch_pinned", "off", set_eval_bool, acc);
+
   s = set_add(&acc->set, "auto_join", "off", set_eval_bool, acc);
+  s->flags |= ACC_SET_OFFLINE_ONLY;
+
   s = set_add(&acc->set, "auto_join_exclude", "", NULL, acc);
+  s->flags |= ACC_SET_OFFLINE_ONLY;
 
   s = set_add(&acc->set, "max_backlog", "50", set_eval_int, acc);
   s->flags |= ACC_SET_OFFLINE_ONLY;
