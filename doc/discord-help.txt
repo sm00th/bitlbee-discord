@@ -5,7 +5,9 @@ This will show you the list of available channel with indexes that can be used f
 <trac3r> chat add discord !1 #mydiscordchannel
 <trac3r> chan #mydiscordchannel set auto_join true
 <trac3r> /join #mydiscordchannel
-If you set auto_join to true, next time you reconnect there will be no need to join the channel manually.
+If you set auto_join to true, next time you reconnect there will be no need to join the channel manually.
+Alternatively, you may set the auto_join setting on the account itself (account discord set auto_join on) to automatically join all of the server's channels.
+You can exclude channels from auto-joining using the auto_join_exclude setting.
 See help discord options for more.
 %
 ?discord options
@@ -83,7 +85,7 @@ With this option enabled, online/offline status is determined by the friendship 
 %
 ?discord auto_join
 auto_join (type: boolean; default: off)
-Automatically join your discord channels.
+Automatically join all of the server's channels so you don't have to add them manually (no "chat add" needed).
 %
 ?discord auto_join_exclude
 auto_join_exclude (type: string; default: "")
