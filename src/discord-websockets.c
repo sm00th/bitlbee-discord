@@ -346,7 +346,7 @@ void discord_ws_set_status(discord_data *dd, gboolean idle, gchar *message)
   }
 
   if (idle == TRUE) {
-    g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":%tu,\"game\":{\"name\":\"%s\",\"type\":0},\"afk\":true,\"status\":\"idle\"}}", OPCODE_STATUS_UPDATE, time(NULL)*1000, msg);
+    g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":%llu,\"game\":{\"name\":\"%s\",\"type\":0},\"afk\":true,\"status\":\"idle\"}}", OPCODE_STATUS_UPDATE, ((unsigned long long)time(NULL))*1000, msg);
   } else if (message != NULL) {
     g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":{\"name\":\"%s\",\"type\":0},\"afk\":false,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE, msg);
   } else {
