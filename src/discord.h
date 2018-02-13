@@ -56,6 +56,7 @@ typedef struct _gw_data {
 typedef struct _discord_data {
   char     *token;
   char     *id;
+  char     *session_id;
   char     *uname;
   char     *nonce;
   gw_data  *gateway;

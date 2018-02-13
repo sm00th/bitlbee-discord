@@ -838,6 +838,7 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
       dd->id = json_o_strdup(user, "id");
       dd->uname = discord_canonize_name(json_o_str(user, "username"));
     }
+    dd->session_id = json_o_strdup(data, "session_id");
 
     discord_add_global_server(ic);
     json_value *guilds = json_o_get(data, "guilds");

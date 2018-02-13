@@ -122,6 +122,7 @@ void free_discord_data(discord_data *dd)
   g_free(dd->nonce);
   g_free(dd->token);
   g_free(dd->uname);
+  g_free(dd->session_id);
   g_free(dd->id);
 
   g_free(dd);
