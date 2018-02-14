@@ -679,7 +679,7 @@ static gboolean discord_prepare_message(struct im_connection *ic,
     g_free(msg);
     msg = emoji_msg;
     g_regex_unref(emoji_regex);
-    
+
     GRegex *cregex = g_regex_new("<#(\\d+)>", 0, 0, NULL);
     gchar *fmsg = g_regex_replace_eval(cregex, msg, -1, 0, 0,
                                        discord_replace_channel,
@@ -819,8 +819,7 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
     // heartbeat ack
   } else if (op == OPCODE_RECONNECT) {
     imcb_log(ic, "Reconnect requested");
-    imc_logout(ic, TRUE);
-    disconnected = TRUE;
+    discord_reconnect(ic);
   } else if (op == OPCODE_INVALID_SESSION) {
     imcb_error(ic, "Invalid session, reconnecting");
     imc_logout(ic, TRUE);
@@ -967,6 +966,9 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
   } else if (g_strcmp0(event, "RELATIONSHIP_REMOVE") == 0) {
     json_value *rinfo = json_o_get(js, "d");
     discord_handle_relationship(ic, rinfo, ACTION_DELETE);
+  } else if (g_strcmp0(event, "RESUMED") == 0) {
+    dd->reconnecting = FALSE;
+    dd->state = WS_READY;
   } else if (g_strcmp0(event, "TYPING_START") == 0) {
     // Ignoring those for now
   } else if (g_strcmp0(event, "USER_UPDATE") == 0) {

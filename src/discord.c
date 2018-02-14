@@ -117,6 +117,15 @@ static void discord_init(account_t *acc)
   discord_help_init();
 }
 
+static void discord_do_login(struct im_connection *ic)
+{
+  if (set_getstr(&ic->acc->set,"token_cache")) {
+    discord_http_get_gateway(ic, set_getstr(&ic->acc->set,"token_cache"));
+  } else {
+    discord_http_login(ic->acc);
+  }
+}
+
 static void discord_login(account_t *acc)
 {
   struct im_connection *ic = imcb_new(acc);
@@ -129,11 +138,7 @@ static void discord_login(account_t *acc)
   random_bytes(nonce_bytes, sizeof(nonce_bytes));
   dd->nonce = g_base64_encode(nonce_bytes, sizeof(nonce_bytes));
 
-  if (set_getstr(&ic->acc->set,"token_cache")) {
-    discord_http_get_gateway(ic, set_getstr(&ic->acc->set,"token_cache"));
-  } else {
-    discord_http_login(acc);
-  }
+  discord_do_login(ic);
 }
 
 static void discord_logout(struct im_connection *ic)
@@ -144,6 +149,15 @@ static void discord_logout(struct im_connection *ic)
 
   free_discord_data(dd);
   g_slist_free(ic->chatlist);
+}
+
+void discord_reconnect(struct im_connection *ic)
+{
+  discord_data *dd = ic->proto_data;
+
+  discord_ws_cleanup(dd);
+  dd->reconnecting = TRUE;
+  discord_do_login(ic);
 }
 
 static void discord_chat_msg(struct groupchat *gc, char *msg, int flags)

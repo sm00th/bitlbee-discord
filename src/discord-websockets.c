@@ -97,7 +97,11 @@ static gboolean discord_ws_writable(gpointer data, int source,
   discord_data *dd = ic->proto_data;
   if (dd->state == WS_CONNECTED) {
     GString *buf = g_string_new("");
-    g_string_printf(buf, "{\"d\":{\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"},\"compress\":false,\"large_threshold\":250,\"synced_guilds\":[]},\"op\":%d}", dd->token, OPCODE_IDENTIFY);
+    if (dd->reconnecting == TRUE) {
+      g_string_printf(buf, "{\"d\":{\"token\":\"%s\",\"session_id\":\"%s\",\"seq\":%"G_GUINT64_FORMAT"},\"op\":%d}", dd->token, dd->session_id, dd->seq, OPCODE_RESUME);
+    } else {
+      g_string_printf(buf, "{\"d\":{\"token\":\"%s\",\"properties\":{\"$referring_domain\":\"\",\"$browser\":\"bitlbee-discord\",\"$device\":\"bitlbee\",\"$referrer\":\"\",\"$os\":\"linux\"},\"compress\":false,\"large_threshold\":250,\"synced_guilds\":[]},\"op\":%d}", dd->token, OPCODE_IDENTIFY);
+    }
 
     discord_ws_send_payload(dd, buf->str, buf->len);
     g_string_free(buf, TRUE);

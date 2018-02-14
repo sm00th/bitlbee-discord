@@ -75,6 +75,7 @@ typedef struct _discord_data {
   guint    pending_sync;
   GSList   *pending_reqs;
   GSList   *pending_events;
+  gboolean reconnecting;
 } discord_data;
 
 typedef struct _server_info {
@@ -125,5 +126,6 @@ gboolean discord_is_self(struct im_connection *ic, const char *who);
 struct groupchat *discord_chat_do_join(struct im_connection *ic,
                                        const char *name,
                                        gboolean is_auto_join);
+void discord_reconnect(struct im_connection *ic);
 
 #endif //__DISCORD_H
