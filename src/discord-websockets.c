@@ -90,6 +90,15 @@ void discord_ws_sync_server(discord_data *dd, const char *id)
   g_string_free(buf, TRUE);
 }
 
+static gboolean discord_ws_heartbeat_timeout(gpointer data, gint fd,
+                                             b_input_condition cond)
+{
+  struct im_connection *ic = data;
+  imcb_log(ic, "Heartbeat timed out, reconnecting...");
+  discord_reconnect(ic);
+  return FALSE;
+}
+
 static gboolean discord_ws_writable(gpointer data, int source,
                                     b_input_condition cond)
 {
@@ -115,6 +124,8 @@ static gboolean discord_ws_writable(gpointer data, int source,
                       dd->seq);
     }
     discord_ws_send_payload(dd, buf->str, buf->len);
+    dd->heartbeat_timeout_id = b_timeout_add(HEARTBEAT_ACK_TIMEOUT,
+                                             discord_ws_heartbeat_timeout, ic);
     g_string_free(buf, TRUE);
   } else {
     imcb_error(ic, "Unhandled writable callback.");
@@ -129,7 +140,6 @@ static void discord_ws_callback_on_writable(struct im_connection *ic)
   discord_data *dd = ic->proto_data;
   dd->wsid = b_input_add(dd->sslfd, B_EV_IO_WRITE, discord_ws_writable, ic);
 }
-
 
 gboolean discord_ws_keepalive_loop(gpointer data, gint fd,
                                    b_input_condition cond)
@@ -322,6 +332,11 @@ void discord_ws_cleanup(discord_data *dd)
   if (dd->keepalive_loop_id > 0) {
     b_event_remove(dd->keepalive_loop_id);
     dd->keepalive_loop_id = 0;
+  }
+
+  if (dd->heartbeat_timeout_id > 0) {
+    b_event_remove(dd->heartbeat_timeout_id);
+    dd->heartbeat_timeout_id = 0;
   }
 
   if (dd->wsid > 0) {

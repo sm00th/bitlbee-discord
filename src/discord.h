@@ -21,6 +21,7 @@
 
 #define DISCORD_HOST "discordapp.com"
 #define DEFAULT_KEEPALIVE_INTERVAL 30000
+#define HEARTBEAT_ACK_TIMEOUT 7000
 #define DISCORD_MFA_HANDLE "discord_mfa"
 
 typedef enum {
@@ -67,6 +68,7 @@ typedef struct _discord_data {
   ws_state state;
   gint     keepalive_interval;
   gint     keepalive_loop_id;
+  gint     heartbeat_timeout_id;
   void     *ssl;
   int      sslfd;
   int      inpa;

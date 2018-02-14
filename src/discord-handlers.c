@@ -816,7 +816,10 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
   } else if (op == OPCODE_HEARTBEAT) {
     discord_ws_keepalive_loop(ic, 0, 0);
   } else if (op == OPCODE_HEARTBEAT_ACK) {
-    // heartbeat ack
+    if (dd->heartbeat_timeout_id > 0) {
+      b_event_remove(dd->heartbeat_timeout_id);
+      dd->heartbeat_timeout_id = 0;
+    }
   } else if (op == OPCODE_RECONNECT) {
     imcb_log(ic, "Reconnect requested");
     discord_reconnect(ic);
