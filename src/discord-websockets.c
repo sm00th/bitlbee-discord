@@ -153,6 +153,17 @@ gboolean discord_ws_keepalive_loop(gpointer data, gint fd,
   return TRUE;
 }
 
+static void discord_ws_reconnect(struct im_connection *ic)
+{
+  discord_data *dd = ic->proto_data;
+
+  if (dd->state == WS_READY) {
+    discord_soft_reconnect(ic);
+  } else {
+    imc_logout(ic, TRUE);
+  }
+}
+
 static gboolean discord_ws_in_cb(gpointer data, int source,
                                  b_input_condition cond)
 {
@@ -182,13 +193,13 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
 
     if (ssl_read(dd->ssl, &buf, 1) < 1) {
       imcb_error(ic, "Failed to read ws header.");
-      imc_logout(ic, TRUE);
+      discord_ws_reconnect(ic);
       return FALSE;
     }
 
     if ((buf & 0xf0) != 0x80) {
       imcb_error(ic, "Unexpected websockets header [0x%x], exiting", buf);
-      imc_logout(ic, TRUE);
+      discord_ws_reconnect(ic);
       return FALSE;
     }
 
@@ -197,14 +208,16 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
       if (dd->state == WS_CONNECTED) {
         imcb_log(ic, "Token expired, cleaning up");
         set_setstr(&ic->acc->set, "token_cache", NULL);
+        imc_logout(ic, TRUE);
+      } else {
+        discord_ws_reconnect(ic);
       }
-      imc_logout(ic, TRUE);
       return FALSE;
     }
 
     if (ssl_read(dd->ssl, &buf, 1) < 1) {
       imcb_error(ic, "Failed to read first length byte.");
-      imc_logout(ic, TRUE);
+      discord_ws_reconnect(ic);
       return FALSE;
     }
     len = buf & 0x7f;
@@ -214,7 +227,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
       guint16 lbuf;
       if (ssl_read(dd->ssl, (gchar*)&lbuf, 2) < 2) {
         imcb_error(ic, "Failed to read the rest of length (small).");
-        imc_logout(ic, TRUE);
+        discord_ws_reconnect(ic);
         return FALSE;
       }
       len = GUINT16_FROM_BE(lbuf);
@@ -222,7 +235,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
       guint64 lbuf;
       if (ssl_read(dd->ssl, (gchar*)&lbuf, 8) < 8) {
         imcb_error(ic, "Failed to read the rest of length (big).");
-        imc_logout(ic, TRUE);
+        discord_ws_reconnect(ic);
         return FALSE;
       }
       len = GUINT64_FROM_BE(lbuf);
@@ -231,7 +244,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     if (mask) {
       if (ssl_read(dd->ssl, (gchar*)mkey, 4) < 4) {
         imcb_error(ic, "Failed to read ws data.");
-        imc_logout(ic, TRUE);
+        discord_ws_reconnect(ic);
         return FALSE;
       }
     }
@@ -247,7 +260,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
 
     if (read != len) {
         imcb_error(ic, "Short-read on ws data.");
-        imc_logout(ic, TRUE);
+        discord_ws_reconnect(ic);
         g_free(rdata);
         return FALSE;
     }
