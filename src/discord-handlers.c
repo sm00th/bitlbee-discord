@@ -822,7 +822,7 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
     }
   } else if (op == OPCODE_RECONNECT) {
     imcb_log(ic, "Reconnect requested");
-    discord_reconnect(ic);
+    discord_soft_reconnect(ic);
   } else if (op == OPCODE_INVALID_SESSION) {
     imcb_error(ic, "Invalid session, reconnecting");
     imc_logout(ic, TRUE);

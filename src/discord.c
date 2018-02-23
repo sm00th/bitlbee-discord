@@ -151,10 +151,11 @@ static void discord_logout(struct im_connection *ic)
   g_slist_free(ic->chatlist);
 }
 
-void discord_reconnect(struct im_connection *ic)
+void discord_soft_reconnect(struct im_connection *ic)
 {
   discord_data *dd = ic->proto_data;
 
+  imcb_log(ic, "Performing soft-reconnect");
   discord_ws_cleanup(dd);
   dd->reconnecting = TRUE;
   discord_do_login(ic);

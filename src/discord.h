@@ -128,6 +128,6 @@ gboolean discord_is_self(struct im_connection *ic, const char *who);
 struct groupchat *discord_chat_do_join(struct im_connection *ic,
                                        const char *name,
                                        gboolean is_auto_join);
-void discord_reconnect(struct im_connection *ic);
+void discord_soft_reconnect(struct im_connection *ic);
 
 #endif //__DISCORD_H
