@@ -139,7 +139,7 @@ static void discord_http_gateway_cb(struct http_request *req)
   if (req->status_code == 200) {
     json_value *js = json_parse(req->reply_body, req->body_size);
     if (!js || js->type != json_object) {
-      imcb_error(ic, "Failed to parse json reply.");
+      imcb_error(ic, "Failed to parse json reply (%s)", __func__);
       imc_logout(ic, TRUE);
       json_value_free(js);
       return;
@@ -217,7 +217,7 @@ static void discord_http_mfa_cb(struct http_request *req)
 
   json_value *js = json_parse(req->reply_body, req->body_size);
   if (!js || js->type != json_object) {
-    imcb_error(ic, "Failed to parse json reply.");
+    imcb_error(ic, "Failed to parse json reply (%s)", __func__);
     imc_logout(ic, TRUE);
     json_value_free(js);
     return;
@@ -249,7 +249,7 @@ static void discord_http_login_cb(struct http_request *req)
 
   json_value *js = json_parse(req->reply_body, req->body_size);
   if (!js || js->type != json_object) {
-    imcb_error(ic, "Failed to parse json reply.");
+    imcb_error(ic, "Failed to parse json reply (%s)", __func__);
     imc_logout(ic, TRUE);
     json_value_free(js);
     return;
@@ -336,7 +336,7 @@ static void discord_http_backlog_cb(struct http_request *req)
   } else {
     json_value *messages = json_parse(req->reply_body, req->body_size);
     if (!messages || messages->type != json_array) {
-      imcb_error(ic, "Failed to parse json reply for backlog.");
+      imcb_error(ic, "Failed to parse json reply (%s)", __func__);
       imc_logout(ic, TRUE);
       json_value_free(messages);
       return;
@@ -380,7 +380,7 @@ static void discord_http_pinned_cb(struct http_request *req)
   } else {
     json_value *messages = json_parse(req->reply_body, req->body_size);
     if (!messages || messages->type != json_array) {
-      imcb_error(ic, "Failed to parse json reply for pinned messages.");
+      imcb_error(ic, "Failed to parse json reply (%s)", __func__);
       imc_logout(ic, TRUE);
       json_value_free(messages);
       return;

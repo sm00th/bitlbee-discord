@@ -784,7 +784,7 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
   discord_debug("<<< (%s) %s %"G_GUINT64_FORMAT"\n%s\n", dd->uname, __func__, size, buf);
 
   if (!js || js->type != json_object) {
-    imcb_error(ic, "Failed to parse json reply.");
+    imcb_error(ic, "Failed to parse json reply (%s)", __func__);
     imc_logout(ic, TRUE);
     disconnected = TRUE;
     goto exit;
