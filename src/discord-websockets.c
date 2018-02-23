@@ -181,7 +181,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     gboolean disconnected;
 
     if (ssl_read(dd->ssl, &buf, 1) < 1) {
-      imcb_error(ic, "Failed to read data.");
+      imcb_error(ic, "Failed to read ws header.");
       imc_logout(ic, TRUE);
       return FALSE;
     }
@@ -203,7 +203,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     }
 
     if (ssl_read(dd->ssl, &buf, 1) < 1) {
-      imcb_error(ic, "Failed to read data.");
+      imcb_error(ic, "Failed to read first length byte.");
       imc_logout(ic, TRUE);
       return FALSE;
     }
@@ -213,7 +213,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     if (len == 126) {
       guint16 lbuf;
       if (ssl_read(dd->ssl, (gchar*)&lbuf, 2) < 2) {
-        imcb_error(ic, "Failed to read data.");
+        imcb_error(ic, "Failed to read the rest of length (small).");
         imc_logout(ic, TRUE);
         return FALSE;
       }
@@ -221,7 +221,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     } else if (len == 127) {
       guint64 lbuf;
       if (ssl_read(dd->ssl, (gchar*)&lbuf, 8) < 8) {
-        imcb_error(ic, "Failed to read data.");
+        imcb_error(ic, "Failed to read the rest of length (big).");
         imc_logout(ic, TRUE);
         return FALSE;
       }
@@ -230,7 +230,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
 
     if (mask) {
       if (ssl_read(dd->ssl, (gchar*)mkey, 4) < 4) {
-        imcb_error(ic, "Failed to read data.");
+        imcb_error(ic, "Failed to read ws data.");
         imc_logout(ic, TRUE);
         return FALSE;
       }
@@ -246,7 +246,7 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
     }
 
     if (read != len) {
-        imcb_error(ic, "Failed to read data.");
+        imcb_error(ic, "Short-read on ws data.");
         imc_logout(ic, TRUE);
         g_free(rdata);
         return FALSE;
