@@ -124,7 +124,7 @@ static gboolean discord_ws_writable(gpointer data, int source,
                       dd->seq);
     }
     discord_ws_send_payload(dd, buf->str, buf->len);
-    dd->heartbeat_timeout_id = b_timeout_add(HEARTBEAT_ACK_TIMEOUT,
+    dd->heartbeat_timeout_id = b_timeout_add((dd->keepalive_interval - 100),
                                              discord_ws_heartbeat_timeout, ic);
     g_string_free(buf, TRUE);
   } else {
