@@ -49,6 +49,9 @@ After that (or when building from a tarball) you can build as usual:
 If your bitlbee's plugindir is in non-standard location you can specify it by
 calling ./configure with --with-plugindir=/path/to/plugindir option.
 
+You can also use the dockerfile from contrib/docker to build a docker container
+containing bitlbee + bitlbee-discord.
+
 Usage
 -----
 Plugin adds 'discord' protocol to bitlbee, add your account as usual:
