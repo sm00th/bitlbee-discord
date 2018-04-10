@@ -23,6 +23,14 @@
 #include "discord-util.h"
 #include "discord.h"
 
+#define DISCORD_STATUS_TIMEOUT 500
+
+typedef struct {
+  discord_data *dd;
+  gboolean idle;
+  gchar *msg;
+} status_data;
+
 static gchar *discord_ws_mask(guchar key[4], const char *pload,
                               guint64 psize)
 {
@@ -340,27 +348,21 @@ int discord_ws_init(struct im_connection *ic, discord_data *dd)
   return 0;
 }
 
+static void discord_ws_remove_event(gint *event)
+{
+  if (*event > 0) {
+    b_event_remove(*event);
+    *event = 0;
+  }
+}
+
 void discord_ws_cleanup(discord_data *dd)
 {
-  if (dd->keepalive_loop_id > 0) {
-    b_event_remove(dd->keepalive_loop_id);
-    dd->keepalive_loop_id = 0;
-  }
-
-  if (dd->heartbeat_timeout_id > 0) {
-    b_event_remove(dd->heartbeat_timeout_id);
-    dd->heartbeat_timeout_id = 0;
-  }
-
-  if (dd->wsid > 0) {
-    b_event_remove(dd->wsid);
-    dd->wsid = 0;
-  }
-
-  if (dd->inpa > 0) {
-    b_event_remove(dd->inpa);
-    dd->inpa = 0;
-  }
+  discord_ws_remove_event(&dd->keepalive_loop_id);
+  discord_ws_remove_event(&dd->heartbeat_timeout_id);
+  discord_ws_remove_event(&dd->status_timeout_id);
+  discord_ws_remove_event(&dd->wsid);
+  discord_ws_remove_event(&dd->inpa);
 
   if (dd->ssl != NULL) {
     ssl_disconnect(dd->ssl);
@@ -368,10 +370,38 @@ void discord_ws_cleanup(discord_data *dd)
   }
 }
 
+static gboolean discord_ws_status_postponed(status_data *sd, gint fd,
+                                            b_input_condition cond)
+{
+  if (sd->dd->state != WS_READY) {
+    return TRUE;
+  }
+
+  discord_ws_set_status(sd->dd, sd->idle, sd->msg);
+
+  g_free(sd->msg);
+  g_free(sd);
+  sd->dd->status_timeout_id = 0;
+
+  return FALSE;
+}
+
 void discord_ws_set_status(discord_data *dd, gboolean idle, gchar *message)
 {
   GString *buf = g_string_new("");
   gchar *msg = NULL;
+
+  if (dd->state != WS_READY) {
+    if (dd->status_timeout_id == 0) {
+      status_data *sdata = g_new0(status_data, 1);
+      sdata->dd = dd;
+      sdata->idle = idle;
+      sdata->msg = g_strdup(message);
+      dd->status_timeout_id = b_timeout_add(DISCORD_STATUS_TIMEOUT,
+        (b_event_handler)discord_ws_status_postponed, sdata);
+    }
+    return;
+  }
 
   if (message != NULL) {
     msg = discord_escape_string(message);

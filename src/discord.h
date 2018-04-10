@@ -68,10 +68,11 @@ typedef struct _discord_data {
   gint     keepalive_interval;
   gint     keepalive_loop_id;
   gint     heartbeat_timeout_id;
+  gint     status_timeout_id;
   void     *ssl;
   int      sslfd;
-  int      inpa;
-  guint    wsid;
+  gint     inpa;
+  gint     wsid;
   guint64  seq;
   guint    pending_sync;
   GSList   *pending_reqs;
