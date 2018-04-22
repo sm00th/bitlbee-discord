@@ -244,6 +244,17 @@ struct groupchat *discord_chat_do_join(struct im_connection *ic,
   return gc;
 }
 
+static void discord_chat_leave(struct groupchat *gc)
+{
+  channel_info *cinfo = gc->data;
+  server_info *sinfo = cinfo->to.channel.sinfo;
+  discord_data *dd = sinfo->ic->proto_data;
+  
+  sinfo->channels = g_slist_remove(sinfo->channels, cinfo);
+  dd->pchannels = g_slist_remove(dd->pchannels, cinfo);
+  free_channel_info(cinfo);
+}
+
 static int discord_buddy_msg(struct im_connection *ic, char *to, char *msg,
                              int flags)
 {
@@ -304,6 +315,7 @@ G_MODULE_EXPORT void init_plugin(void)
     .chat_msg = discord_chat_msg,
     .chat_list = discord_chat_list,
     .chat_join = discord_chat_join,
+    .chat_leave = discord_chat_leave,
     .buddy_msg = discord_buddy_msg,
     .handle_cmp = g_strcmp0,
     .handle_is_self = discord_is_self,
