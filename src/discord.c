@@ -247,12 +247,8 @@ struct groupchat *discord_chat_do_join(struct im_connection *ic,
 static void discord_chat_leave(struct groupchat *gc)
 {
   channel_info *cinfo = gc->data;
-  server_info *sinfo = cinfo->to.channel.sinfo;
-  discord_data *dd = sinfo->ic->proto_data;
-  
-  sinfo->channels = g_slist_remove(sinfo->channels, cinfo);
-  dd->pchannels = g_slist_remove(dd->pchannels, cinfo);
-  free_channel_info(cinfo);
+  imcb_chat_free(cinfo->to.channel.gc);
+  cinfo->to.channel.gc = NULL;
 }
 
 static int discord_buddy_msg(struct im_connection *ic, char *to, char *msg,
