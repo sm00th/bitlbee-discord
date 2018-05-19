@@ -276,11 +276,14 @@ static void discord_http_login_cb(struct http_request *req)
         json_value *em = NULL;
         json_value *email = json_o_get(js, "email");
         json_value *password = json_o_get(js, "password");
+        json_value *captcha_key = json_o_get(js, "captcha_key");
 
         if (email != NULL && email->type == json_array) {
           em = email->u.array.values[0];
         } else if (password != NULL && password->type == json_array) {
           em = password->u.array.values[0];
+        } else if (captcha_key != NULL && captcha_key->type == json_array) {
+          em = captcha_key->u.array.values[0];
         }
 
         if (em != NULL && em->type == json_string) {
