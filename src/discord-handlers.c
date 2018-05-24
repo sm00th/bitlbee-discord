@@ -590,7 +590,7 @@ static gboolean discord_replace_channel(const GMatchInfo *match,
 
 static gboolean discord_prepare_message(struct im_connection *ic,
                                     json_value *minfo,
-                                    channel_info *cinfo, gboolean is_edit)
+                                    channel_info *cinfo, gboolean is_edit, gboolean is_old)
 {
   discord_data *dd = ic->proto_data;
   gboolean posted = FALSE;
@@ -604,7 +604,7 @@ static gboolean discord_prepare_message(struct im_connection *ic,
   const char *nonce = json_o_str(minfo, "nonce");
   gboolean is_self = discord_is_self(ic, author);
   
-  time_t at = parse_iso_8601(json_o_str(minfo, "timestamp"));
+  time_t at = is_old ? parse_iso_8601(json_o_str(minfo, "timestamp")) : 0;
 
   // Don't echo self messages that we sent in this session
   if (is_self && nonce != NULL && g_strcmp0(nonce, dd->nonce) == 0) {
@@ -712,7 +712,7 @@ static gboolean discord_prepare_message(struct im_connection *ic,
 }
 
 void discord_handle_message(struct im_connection *ic, json_value *minfo,
-                            handler_action action)
+                            handler_action action, gboolean is_old)
 {
   discord_data *dd = ic->proto_data;
 
@@ -726,7 +726,7 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
     return;
   }
   
-  time_t at = parse_iso_8601(json_o_str(minfo, "timestamp"));
+  time_t at = is_old ? parse_iso_8601(json_o_str(minfo, "timestamp")) : 0;
 
   if (action == ACTION_CREATE) {
     guint64 msgid = g_ascii_strtoull(json_o_str(minfo, "id"), NULL, 10);
@@ -737,7 +737,7 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
     if ((msgid > cinfo->last_read) || (pinned &&
           !g_slist_find_custom(cinfo->pinned, json_o_str(minfo, "id"),
           (GCompareFunc)g_strcmp0))) {
-      gboolean posted = discord_prepare_message(ic, minfo, cinfo, FALSE);
+      gboolean posted = discord_prepare_message(ic, minfo, cinfo, FALSE, is_old);
       if (posted) {
         if (msgid > cinfo->last_read) {
           cinfo->last_read = msgid;
@@ -752,7 +752,7 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
     }
   } else if (action == ACTION_UPDATE) {
     if (json_o_str(json_o_get(minfo, "author"), "username") != NULL) {
-      discord_prepare_message(ic, minfo, cinfo, TRUE);
+      discord_prepare_message(ic, minfo, cinfo, TRUE, is_old);
     } else {
       json_value *embeds = json_o_get(minfo, "embeds");
       if (embeds != NULL && embeds->type == json_array) {
@@ -970,10 +970,10 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
     discord_handle_server(ic, sinfo, ACTION_DELETE);
   } else if (g_strcmp0(event, "MESSAGE_CREATE") == 0) {
     json_value *minfo = json_o_get(js, "d");
-    discord_handle_message(ic, minfo, ACTION_CREATE);
+    discord_handle_message(ic, minfo, ACTION_CREATE, FALSE);
   } else if (g_strcmp0(event, "MESSAGE_UPDATE") == 0) {
     json_value *minfo = json_o_get(js, "d");
-    discord_handle_message(ic, minfo, ACTION_UPDATE);
+    discord_handle_message(ic, minfo, ACTION_UPDATE, TRUE);
   } else if (g_strcmp0(event, "RELATIONSHIP_ADD") == 0) {
     json_value *rinfo = json_o_get(js, "d");
     discord_handle_relationship(ic, rinfo, ACTION_CREATE);

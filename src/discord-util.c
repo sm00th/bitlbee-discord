@@ -385,8 +385,8 @@ char *discord_utf8_strndup(const char *str, size_t n)
 
 time_t parse_iso_8601(const char *timestamp)
 {
-	struct tm tm;
-	if (timestamp == NULL) return 0;
-	if (strptime(timestamp, "%Y-%m-%dT%H:%M:%S.", &tm) == NULL) return 0;
-	return mktime(&tm);
+  struct tm tm;
+  if (timestamp == NULL) return 0;
+  if (strptime(timestamp, "%Y-%m-%dT%H:%M:%S.", &tm) == NULL) return 0;
+  return mktime(&tm);
 }
