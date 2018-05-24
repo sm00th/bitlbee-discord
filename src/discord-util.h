@@ -17,6 +17,7 @@
 #include "discord.h"
 #include <stdlib.h>
 #include <glib.h>
+#include <time.h>
 
 typedef enum {
   SEARCH_UNKNOWN,
@@ -43,3 +44,7 @@ char *discord_canonize_name(const char *name);
 char *discord_escape_string(const char *msg);
 void discord_debug(char *format, ...);
 char *discord_utf8_strndup(const char *str, size_t n);
+
+/* input: 2018-05-24T19:06:42.190000+00:00 */
+/* output: 1527188802 (the .19 and timezone are discarded) */
+time_t parse_iso_8601(const char *timestamp);
