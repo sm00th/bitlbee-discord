@@ -537,7 +537,7 @@ static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
 }
 
 static gboolean discord_post_message(channel_info *cinfo, const gchar *author,
-                                 gchar *msg, gboolean is_self, time_t at)
+                                 gchar *msg, gboolean is_self, time_t tstamp)
 {
   int flags = 0;
 
@@ -550,13 +550,13 @@ static gboolean discord_post_message(channel_info *cinfo, const gchar *author,
   }
 
   if (cinfo->type == CHANNEL_PRIVATE) {
-    imcb_buddy_msg(cinfo->to.handle.ic, author, msg, flags, at);
+    imcb_buddy_msg(cinfo->to.handle.ic, author, msg, flags, tstamp);
     return TRUE;
   } else if (cinfo->type == CHANNEL_GROUP_PRIVATE && cinfo->to.group.gc != NULL) {
-    imcb_chat_msg(cinfo->to.group.gc, author, msg, flags, at);
+    imcb_chat_msg(cinfo->to.group.gc, author, msg, flags, tstamp);
     return TRUE;
   } else if (cinfo->type == CHANNEL_TEXT && cinfo->to.channel.gc != NULL) {
-    imcb_chat_msg(cinfo->to.channel.gc, author, msg, flags, at);
+    imcb_chat_msg(cinfo->to.channel.gc, author, msg, flags, tstamp);
     return TRUE;
   }
   return FALSE;
@@ -590,7 +590,7 @@ static gboolean discord_replace_channel(const GMatchInfo *match,
 
 static gboolean discord_prepare_message(struct im_connection *ic,
                                     json_value *minfo,
-                                    channel_info *cinfo, gboolean is_edit, gboolean is_old)
+                                    channel_info *cinfo, gboolean is_edit, gboolean use_tstamp)
 {
   discord_data *dd = ic->proto_data;
   gboolean posted = FALSE;
@@ -604,7 +604,7 @@ static gboolean discord_prepare_message(struct im_connection *ic,
   const char *nonce = json_o_str(minfo, "nonce");
   gboolean is_self = discord_is_self(ic, author);
   
-  time_t at = is_old ? parse_iso_8601(json_o_str(minfo, "timestamp")) : 0;
+  time_t tstamp = use_tstamp ? parse_iso_8601(json_o_str(minfo, "timestamp")) : 0;
 
   // Don't echo self messages that we sent in this session
   if (is_self && nonce != NULL && g_strcmp0(nonce, dd->nonce) == 0) {
@@ -653,7 +653,7 @@ static gboolean discord_prepare_message(struct im_connection *ic,
   }
 
   if (cinfo->type == CHANNEL_PRIVATE) {
-    posted = discord_post_message(cinfo, cinfo->to.handle.name, msg, is_self, at);
+    posted = discord_post_message(cinfo, cinfo->to.handle.name, msg, is_self, tstamp);
   } else if (cinfo->type == CHANNEL_TEXT || cinfo->type == CHANNEL_GROUP_PRIVATE) {
     json_value *mentions = json_o_get(minfo, "mentions");
     if (mentions != NULL && mentions->type == json_array) {
@@ -695,7 +695,7 @@ static gboolean discord_prepare_message(struct im_connection *ic,
                                        ic->proto_data, NULL);
     g_regex_unref(cregex);
 
-    posted = discord_post_message(cinfo, author, fmsg, is_self, at);
+    posted = discord_post_message(cinfo, author, fmsg, is_self, tstamp);
     g_free(fmsg);
   }
 
@@ -703,7 +703,7 @@ static gboolean discord_prepare_message(struct im_connection *ic,
   if (attachments != NULL && attachments->type == json_array) {
     for (int aidx = 0; aidx < attachments->u.array.length; aidx++) {
       const char *url = json_o_str(attachments->u.array.values[aidx], "url");
-      posted = discord_post_message(cinfo, author, (char *)url, is_self, at);
+      posted = discord_post_message(cinfo, author, (char *)url, is_self, tstamp);
     }
   }
   g_free(author);
@@ -712,7 +712,7 @@ static gboolean discord_prepare_message(struct im_connection *ic,
 }
 
 void discord_handle_message(struct im_connection *ic, json_value *minfo,
-                            handler_action action, gboolean is_old)
+                            handler_action action, gboolean use_tstamp)
 {
   discord_data *dd = ic->proto_data;
 
@@ -726,7 +726,7 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
     return;
   }
   
-  time_t at = is_old ? parse_iso_8601(json_o_str(minfo, "timestamp")) : 0;
+  time_t tstamp = use_tstamp ? parse_iso_8601(json_o_str(minfo, "timestamp")) : 0;
 
   if (action == ACTION_CREATE) {
     guint64 msgid = g_ascii_strtoull(json_o_str(minfo, "id"), NULL, 10);
@@ -737,7 +737,7 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
     if ((msgid > cinfo->last_read) || (pinned &&
           !g_slist_find_custom(cinfo->pinned, json_o_str(minfo, "id"),
           (GCompareFunc)g_strcmp0))) {
-      gboolean posted = discord_prepare_message(ic, minfo, cinfo, FALSE, is_old);
+      gboolean posted = discord_prepare_message(ic, minfo, cinfo, FALSE, use_tstamp);
       if (posted) {
         if (msgid > cinfo->last_read) {
           cinfo->last_read = msgid;
@@ -752,7 +752,7 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
     }
   } else if (action == ACTION_UPDATE) {
     if (json_o_str(json_o_get(minfo, "author"), "username") != NULL) {
-      discord_prepare_message(ic, minfo, cinfo, TRUE, is_old);
+      discord_prepare_message(ic, minfo, cinfo, TRUE, use_tstamp);
     } else {
       json_value *embeds = json_o_get(minfo, "embeds");
       if (embeds != NULL && embeds->type == json_array) {
@@ -769,7 +769,7 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
           const char *title = json_o_str(embeds->u.array.values[eidx], "title");
           if (title != NULL) {
             msg = g_strconcat("title: ", title, NULL);
-            discord_post_message(cinfo, author, msg, FALSE, at);
+            discord_post_message(cinfo, author, msg, FALSE, tstamp);
             g_free(msg);
           }
 
@@ -777,7 +777,7 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
                                                "description");
           if (description != NULL) {
             msg = g_strconcat("description: ", description, NULL);
-            discord_post_message(cinfo, author, msg, FALSE, at);
+            discord_post_message(cinfo, author, msg, FALSE, tstamp);
             g_free(msg);
           }
         }

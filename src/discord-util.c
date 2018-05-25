@@ -385,8 +385,17 @@ char *discord_utf8_strndup(const char *str, size_t n)
 
 time_t parse_iso_8601(const char *timestamp)
 {
-  struct tm tm;
-  if (timestamp == NULL) return 0;
-  if (strptime(timestamp, "%Y-%m-%dT%H:%M:%S.", &tm) == NULL) return 0;
-  return mktime(&tm);
+#if GLIB_CHECK_VERSION(2,56,0)
+  if (!timestamp) return 0;
+  GDateTime *dt = g_date_time_new_from_iso8601(timestamp, NULL);
+  if (!dt) return 0;
+  gint64 unix = g_date_time_to_unix(dt);
+  g_date_time_unref(dt);
+  return unix;
+#else
+  GTimeVal gt;
+  if (!timestamp) return 0;
+  if (!g_time_val_from_iso8601(timestamp, &gt)) return 0;
+  return gt.tv_sec;
+#endif
 }
