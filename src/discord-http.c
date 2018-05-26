@@ -344,7 +344,7 @@ static void discord_http_backlog_cb(struct http_request *req)
 
     for (int midx = messages->u.array.length - 1; midx >= 0; midx--) {
       json_value *minfo = messages->u.array.values[midx];
-      discord_handle_message(ic, minfo, ACTION_CREATE);
+      discord_handle_message(ic, minfo, ACTION_CREATE, TRUE);
     }
 
     json_value_free(messages);
@@ -388,7 +388,7 @@ static void discord_http_pinned_cb(struct http_request *req)
 
     for (int midx = messages->u.array.length - 1; midx >= 0; midx--) {
       json_value *minfo = messages->u.array.values[midx];
-      discord_handle_message(ic, minfo, ACTION_CREATE);
+      discord_handle_message(ic, minfo, ACTION_CREATE, TRUE);
     }
 
     json_value_free(messages);
