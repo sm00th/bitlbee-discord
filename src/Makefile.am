@@ -19,7 +19,8 @@ lib_LTLIBRARIES = discord.la
 discord_la_CFLAGS  = \
 	$(BITLBEE_CFLAGS) \
 	$(GLIB_CFLAGS) \
-	-Wall
+	-Wall \
+	-std=c99
 
 discord_la_LDFLAGS = \
 	-module \
