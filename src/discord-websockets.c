@@ -414,15 +414,15 @@ void discord_ws_set_status(discord_data *dd, gchar *status, gchar *message)
 
   if (status != NULL) {
     if (message != NULL) { // game and away
-      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":%llu,\"game\":{\"name\":\"%s\",\"type\":0},\"afk\":false,\"status\":\"%s\"}}", OPCODE_STATUS_UPDATE, ((unsigned long long)time(NULL))*1000, msg, stat);
+      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":%llu,\"game\":{\"name\":\"%s\",\"type\":0},\"afk\":true,\"status\":\"%s\"}}", OPCODE_STATUS_UPDATE, ((unsigned long long)time(NULL))*1000, msg, stat);
     } else { // away
-      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":%llu,\"game\":null,\"afk\":false,\"status\":\"%s\"}}", OPCODE_STATUS_UPDATE, ((unsigned long long)time(NULL))*1000, stat);
+      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":%llu,\"game\":null,\"afk\":true,\"status\":\"%s\"}}", OPCODE_STATUS_UPDATE, ((unsigned long long)time(NULL))*1000, stat);
     }
   } else {
     if (message != NULL) { // game
-      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":{\"name\":\"%s\",\"type\":0},\"afk\":false,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE, msg);
+      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":{\"name\":\"%s\",\"type\":0},\"afk\":true,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE, msg);
     } else { // default
-      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":null,\"afk\":false,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE);
+      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":null,\"afk\":true,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE);
     }
   }
 
