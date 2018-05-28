@@ -286,7 +286,10 @@ static GList *discord_away_states(struct im_connection *ic)
 {
     static GList *m = NULL;
 
-    m = g_list_append(m, "Idle");
+    m = g_list_append(m, "online");
+    m = g_list_append(m, "idle");
+    m = g_list_append(m, "dnd");
+    m = g_list_append(m, "invisible");
 
     return m;
 }
@@ -296,7 +299,7 @@ static void discord_set_away(struct im_connection *ic, char *state,
 {
   discord_data *dd = ic->proto_data;
 
-  discord_ws_set_status(dd, state != NULL, message);
+  discord_ws_set_status(dd, state, message);
 }
 
 G_MODULE_EXPORT void init_plugin(void)
