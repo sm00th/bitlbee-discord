@@ -429,4 +429,5 @@ void discord_ws_set_status(discord_data *dd, gchar *status, gchar *message)
   discord_ws_send_payload(dd, buf->str, buf->len);
   g_string_free(buf, TRUE);
   g_free(msg);
+  g_free(stat);
 }
