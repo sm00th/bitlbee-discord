@@ -122,19 +122,6 @@ static gboolean discord_ws_writable(gpointer data, int source,
 
     discord_ws_send_payload(dd, buf->str, buf->len);
     g_string_free(buf, TRUE);
-  } else if (dd->state == WS_READY) {
-    GString *buf = g_string_new("");
-
-    if (dd->seq == 0) {
-      g_string_printf(buf, "{\"op\":%d,\"d\":null}", OPCODE_HEARTBEAT);
-    } else {
-      g_string_printf(buf, "{\"op\":%d,\"d\":%"G_GUINT64_FORMAT"}", OPCODE_HEARTBEAT,
-                      dd->seq);
-    }
-    discord_ws_send_payload(dd, buf->str, buf->len);
-    dd->heartbeat_timeout_id = b_timeout_add((dd->keepalive_interval - 100),
-                                             discord_ws_heartbeat_timeout, ic);
-    g_string_free(buf, TRUE);
   } else {
     imcb_error(ic, "Unhandled writable callback.");
   }
@@ -155,8 +142,22 @@ gboolean discord_ws_keepalive_loop(gpointer data, gint fd,
   struct im_connection *ic = data;
   discord_data *dd = ic->proto_data;
 
-  if (dd->state == WS_READY) {
-    discord_ws_callback_on_writable(ic);
+  if (dd->state > WS_CONNECTED && dd->state < WS_CLOSING) {
+    GString *buf = g_string_new("");
+
+    if (dd->seq == 0) {
+      g_string_printf(buf, "{\"op\":%d,\"d\":null}", OPCODE_HEARTBEAT);
+    } else {
+      g_string_printf(buf, "{\"op\":%d,\"d\":%"G_GUINT64_FORMAT"}", OPCODE_HEARTBEAT,
+                      dd->seq);
+    }
+    discord_ws_send_payload(dd, buf->str, buf->len);
+    dd->heartbeat_timeout_id = b_timeout_add((dd->keepalive_interval - 100),
+                                             discord_ws_heartbeat_timeout, ic);
+    g_string_free(buf, TRUE);
+  } else {
+    discord_debug("=== (%s) %s tried to send keepalive in a wrong state: %d\n",
+        dd->uname, __func__, dd->state);
   }
   return TRUE;
 }
