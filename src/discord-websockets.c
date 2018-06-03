@@ -420,9 +420,9 @@ void discord_ws_set_status(discord_data *dd, gchar *status, gchar *message)
     }
   } else {
     if (message != NULL) { // game
-      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":{\"name\":\"%s\",\"type\":0},\"afk\":true,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE, msg);
+      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":{\"name\":\"%s\",\"type\":0},\"afk\":false,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE, msg);
     } else { // default
-      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":null,\"afk\":true,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE);
+      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":null,\"afk\":false,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE);
     }
   }
 
