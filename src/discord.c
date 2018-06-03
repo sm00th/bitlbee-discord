@@ -89,6 +89,7 @@ static void discord_init(account_t *acc)
   s = set_add(&acc->set, "mention_ignorecase", "off", set_eval_bool, acc);
   s = set_add(&acc->set, "incoming_me_translation", "on", set_eval_bool, acc);
   s = set_add(&acc->set, "fetch_pinned", "off", set_eval_bool, acc);
+  s = set_add(&acc->set, "always_afk", "off", set_eval_bool, acc);
 
   s = set_add(&acc->set, "auto_join", "off", set_eval_bool, acc);
   s->flags |= ACC_SET_OFFLINE_ONLY;
@@ -297,9 +298,7 @@ static GList *discord_away_states(struct im_connection *ic)
 static void discord_set_away(struct im_connection *ic, char *state,
                              char *message)
 {
-  discord_data *dd = ic->proto_data;
-
-  discord_ws_set_status(dd, state, message);
+  discord_ws_set_status(ic, state, message);
 }
 
 G_MODULE_EXPORT void init_plugin(void)

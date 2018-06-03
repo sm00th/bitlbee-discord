@@ -165,6 +165,11 @@ This section describes options available through "account set" bitlbee command
     friendship relationship with a user in addition to their actual away
     status, and other users are added to channels.
 
+  - always_afk (type: boolean; default: off)
+    When enabled bitlbee-discord would always report client's status as afk.
+    This feature is not properly documented in official docs, but it presumably
+    can force push notifications to other clients when bitlbee is connected.
+
 Debugging
 ---------
 You can enable extra debug output for bitlbee-discord, by setting BITLBEE_DEBUG

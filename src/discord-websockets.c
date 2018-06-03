@@ -26,7 +26,7 @@
 #define DISCORD_STATUS_TIMEOUT 500
 
 typedef struct {
-  discord_data *dd;
+  struct im_connection *ic;
   gchar *status;
   gchar *msg;
 } status_data;
@@ -374,22 +374,25 @@ void discord_ws_cleanup(discord_data *dd)
 static gboolean discord_ws_status_postponed(status_data *sd, gint fd,
                                             b_input_condition cond)
 {
-  if (sd->dd->state != WS_READY) {
+  discord_data *dd = sd->ic->proto_data;
+  if (dd->state != WS_READY) {
     return TRUE;
   }
 
-  discord_ws_set_status(sd->dd, sd->status, sd->msg);
+  discord_ws_set_status(sd->ic, sd->status, sd->msg);
 
   g_free(sd->msg);
   g_free(sd->status);
   g_free(sd);
-  sd->dd->status_timeout_id = 0;
+  dd->status_timeout_id = 0;
 
   return FALSE;
 }
 
-void discord_ws_set_status(discord_data *dd, gchar *status, gchar *message)
+void discord_ws_set_status(struct im_connection *ic, gchar *status,
+    gchar *message)
 {
+  discord_data *dd = ic->proto_data;
   GString *buf = g_string_new("");
   gchar *msg = NULL;
   gchar *stat = NULL;
@@ -397,7 +400,7 @@ void discord_ws_set_status(discord_data *dd, gchar *status, gchar *message)
   if (dd->state != WS_READY) {
     if (dd->status_timeout_id == 0) {
       status_data *sdata = g_new0(status_data, 1);
-      sdata->dd = dd;
+      sdata->ic = ic;
       sdata->status = g_strdup(status);
       sdata->msg = g_strdup(message);
       dd->status_timeout_id = b_timeout_add(DISCORD_STATUS_TIMEOUT,
@@ -420,10 +423,16 @@ void discord_ws_set_status(discord_data *dd, gchar *status, gchar *message)
       g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":%llu,\"game\":null,\"afk\":true,\"status\":\"%s\"}}", OPCODE_STATUS_UPDATE, ((unsigned long long)time(NULL))*1000, stat);
     }
   } else {
+    char *afk;
+    if (set_getbool(&ic->acc->set, "always_afk")) {
+      afk = "true";
+    } else {
+      afk = "false";
+    }
     if (message != NULL) { // game
-      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":{\"name\":\"%s\",\"type\":0},\"afk\":false,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE, msg);
+      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":{\"name\":\"%s\",\"type\":0},\"afk\":%s,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE, msg, afk);
     } else { // default
-      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":null,\"afk\":false,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE);
+      g_string_printf(buf, "{\"op\":%d,\"d\":{\"since\":null,\"game\":null,\"afk\":%s,\"status\":\"online\"}}", OPCODE_STATUS_UPDATE, afk);
     }
   }
 

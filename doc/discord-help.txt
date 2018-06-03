@@ -93,3 +93,7 @@ Comma-separated list of channel patterns to exclude when auto-joining channels.
 * matches any text,  ? matches a single character.
 For instance, "Foo.*,Bar.A" will exclude all channels from server "Foo" and channel "A" from server "Bar".
 %
+?always_afk
+always_afk (type: boolean; default: off)
+When enabled bitlbee-discord would always report client's status as afk.  This feature is not properly documented in official docs, but it presumably can force push notifications to other clients when bitlbee is connected.
+%
