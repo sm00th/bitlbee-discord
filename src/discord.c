@@ -289,8 +289,8 @@ static GList *discord_away_states(struct im_connection *ic)
 
     m = g_list_prepend(m, "invisible");
     m = g_list_prepend(m, "dnd");
-    m = g_list_prepend(m, "idle");
     m = g_list_prepend(m, "online");
+    m = g_list_prepend(m, "idle");
 
     return m;
 }
