@@ -329,11 +329,7 @@ user_info *get_user(discord_data *dd, const char *uname,
 
 char *discord_canonize_name(const char *name)
 {
-  GRegex *regex = g_regex_new("[@+ ]", 0, 0, NULL);
-  char *cname = g_regex_replace_literal(regex, name, -1, 0, "_", 0, NULL);
-
-  g_regex_unref(regex);
-  return cname;
+  return str_reject_chars(g_strdup(name), "@+ ", '_');
 }
 
 static gboolean discord_escape(const GMatchInfo *match, GString *result,
