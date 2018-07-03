@@ -42,7 +42,6 @@ void discord_debug(char *format, ...)
 void free_user_info(user_info *uinfo)
 {
   g_free(uinfo->name);
-  g_free(uinfo->id);
   g_free(uinfo);
 }
 
@@ -123,7 +122,6 @@ void free_discord_data(discord_data *dd)
   g_free(dd->token);
   g_free(dd->uname);
   g_free(dd->session_id);
-  g_free(dd->id);
 
   g_free(dd);
 }
@@ -179,9 +177,9 @@ static gint cmp_chan_name_ignorecase(const channel_info *cinfo,
   return result;
 }
 
-static gint cmp_user_id(const user_info *uinfo, const char *user_id)
+static gint cmp_user_id(const user_info *uinfo, guint64 *user_id)
 {
-  return g_strcmp0(uinfo->id, user_id);
+  return uinfo->id == *user_id;
 }
 
 static gint cmp_user_name(const user_info *uinfo, const char *uname)

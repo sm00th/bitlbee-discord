@@ -55,7 +55,7 @@ typedef struct _gw_data {
 
 typedef struct _discord_data {
   char     *token;
-  char     *id;
+  guint64  id;
   char     *session_id;
   char     *uname;
   char     *nonce;
@@ -116,7 +116,7 @@ typedef struct _channel_info {
 } channel_info;
 
 typedef struct _user_info {
-  char                 *id;
+  guint64              id;
   char                 *name;
   channel_info         *voice_channel;
   bee_user_t           *user;
