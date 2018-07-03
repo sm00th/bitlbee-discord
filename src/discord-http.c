@@ -427,7 +427,7 @@ static gboolean discord_mentions_string(const GMatchInfo *match,
   g_free(name);
 
   if (uinfo != NULL) {
-    gchar *id = g_strdup_printf("<@%s>", uinfo->id);
+    gchar *id = g_strdup_printf("<@%" G_GUINT64_FORMAT ">", uinfo->id);
     result = g_string_append(result, id);
     g_free(id);
   } else {
@@ -678,8 +678,8 @@ void discord_http_create_and_send_msg(struct im_connection *ic,
   GString *request = g_string_new("");
   GString *content = g_string_new("");
 
-  g_string_printf(content, "{\"recipient_id\":\"%s\"}", uinfo->id);
-  g_string_printf(request, "POST /api/users/%s/channels HTTP/1.1\r\n"
+  g_string_printf(content, "{\"recipient_id\":\"%" G_GUINT64_FORMAT "\"}", uinfo->id);
+  g_string_printf(request, "POST /api/users/%" G_GUINT64_FORMAT "/channels HTTP/1.1\r\n"
                   "Host: %s\r\n"
                   "User-Agent: Bitlbee-Discord\r\n"
                   "authorization: %s\r\n"

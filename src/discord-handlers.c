@@ -39,7 +39,7 @@ static void discord_handle_voice_state(struct im_connection *ic,
   user_info *uinfo = get_user(dd, json_o_str(vsinfo, "user_id"), server_id,
                               SEARCH_ID);
 
-  if (uinfo == NULL || g_strcmp0(uinfo->id, dd->id) == 0) {
+  if (uinfo == NULL || uinfo->id == dd->id) {
     return;
   }
 
@@ -159,7 +159,7 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
       if (bu != NULL) {
         ui = g_new0(user_info, 1);
         ui->user = bu;
-        ui->id = g_strdup(id);
+        parse_int64((char *) id, 10, &ui->id);
         ui->name = g_strdup(name);
         ui->flags = flags;
 
@@ -741,7 +741,9 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
       if (posted) {
         if (msgid > cinfo->last_read) {
           cinfo->last_read = msgid;
-          if (g_strcmp0(json_o_str(json_o_get(minfo, "author"), "id"), dd->id)) {
+          guint64 num;
+          if (parse_int64((char *) json_o_str(json_o_get(minfo, "author"), "id"), 10, &num) &&
+              num != dd->id) {
             discord_http_send_ack(ic, cinfo->id, json_o_str(minfo, "id"));
           }
         }
@@ -848,7 +850,7 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
 
     json_value *user = json_o_get(data, "user");
     if (user != NULL && user->type == json_object) {
-      dd->id = json_o_strdup(user, "id");
+      parse_int64((char *) json_o_str(user, "id"), 10, &dd->id);
       dd->uname = discord_canonize_name(json_o_str(user, "username"));
     }
     dd->session_id = json_o_strdup(data, "session_id");
