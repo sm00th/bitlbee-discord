@@ -652,52 +652,52 @@ static gboolean discord_prepare_message(struct im_connection *ic,
     g_string_free(tstr, FALSE);
   }
 
-  if (cinfo->type == CHANNEL_PRIVATE) {
-    posted = discord_post_message(cinfo, cinfo->to.handle.name, msg, is_self, tstamp);
-  } else if (cinfo->type == CHANNEL_TEXT || cinfo->type == CHANNEL_GROUP_PRIVATE) {
-    json_value *mentions = json_o_get(minfo, "mentions");
-    if (mentions != NULL && mentions->type == json_array) {
-      for (int midx = 0; midx < mentions->u.array.length; midx++) {
-        json_value *uinfo = mentions->u.array.values[midx];
-        gchar *uname = discord_canonize_name(json_o_str(uinfo, "username"));
-        gchar *newmsg = NULL;
-        gchar *idstr = g_strdup_printf("<@!?%s>", json_o_str(uinfo, "id"));
-        gchar *unstr = g_strdup_printf("@%s", uname);
-        GRegex *regex = g_regex_new(idstr, 0, 0, NULL);
-        newmsg = g_regex_replace_literal(regex, msg, -1, 0,
-                                         unstr, 0, NULL);
-        g_free(msg);
-        msg = newmsg;
-        g_regex_unref(regex);
-        g_free(idstr);
-        g_free(unstr);
-        g_free(uname);
-      }
+  json_value *mentions = json_o_get(minfo, "mentions");
+  if (mentions != NULL && mentions->type == json_array) {
+    for (int midx = 0; midx < mentions->u.array.length; midx++) {
+      json_value *uinfo = mentions->u.array.values[midx];
+      gchar *uname = discord_canonize_name(json_o_str(uinfo, "username"));
+      gchar *newmsg = NULL;
+      gchar *idstr = g_strdup_printf("<@!?%s>", json_o_str(uinfo, "id"));
+      gchar *unstr = g_strdup_printf("@%s", uname);
+      GRegex *regex = g_regex_new(idstr, 0, 0, NULL);
+      newmsg = g_regex_replace_literal(regex, msg, -1, 0,
+                                       unstr, 0, NULL);
+      g_free(msg);
+      msg = newmsg;
+      g_regex_unref(regex);
+      g_free(idstr);
+      g_free(unstr);
+      g_free(uname);
     }
-
-    // Replace animated emoji with code and a URL
-    GRegex *emoji_regex_a = g_regex_new("<a(:[^:]+:)(\\d+)>", 0, 0, NULL);
-    gchar *emoji_msg_a = g_regex_replace(emoji_regex_a, msg, -1, 0, "\\1 <https://cdn.discordapp.com/emojis/\\2.gif>", 0, NULL);
-    g_free(msg);
-    msg = emoji_msg_a;
-    g_regex_unref(emoji_regex_a);
-
-    // Replace custom emoji with code and a URL
-    GRegex *emoji_regex = g_regex_new("<(:[^:]+:)(\\d+)>", 0, 0, NULL);
-    gchar *emoji_msg = g_regex_replace(emoji_regex, msg, -1, 0, "\\1 <https://cdn.discordapp.com/emojis/\\2.png>", 0, NULL);
-    g_free(msg);
-    msg = emoji_msg;
-    g_regex_unref(emoji_regex);
-
-    GRegex *cregex = g_regex_new("<#(\\d+)>", 0, 0, NULL);
-    gchar *fmsg = g_regex_replace_eval(cregex, msg, -1, 0, 0,
-                                       discord_replace_channel,
-                                       ic->proto_data, NULL);
-    g_regex_unref(cregex);
-
-    posted = discord_post_message(cinfo, author, fmsg, is_self, tstamp);
-    g_free(fmsg);
   }
+
+  // Replace animated emoji with code and a URL
+  GRegex *emoji_regex_a = g_regex_new("<a(:[^:]+:)(\\d+)>", 0, 0, NULL);
+  gchar *emoji_msg_a = g_regex_replace(emoji_regex_a, msg, -1, 0, "\\1 <https://cdn.discordapp.com/emojis/\\2.gif>", 0, NULL);
+  g_free(msg);
+  msg = emoji_msg_a;
+  g_regex_unref(emoji_regex_a);
+
+  // Replace custom emoji with code and a URL
+  GRegex *emoji_regex = g_regex_new("<(:[^:]+:)(\\d+)>", 0, 0, NULL);
+  gchar *emoji_msg = g_regex_replace(emoji_regex, msg, -1, 0, "\\1 <https://cdn.discordapp.com/emojis/\\2.png>", 0, NULL);
+  g_free(msg);
+  msg = emoji_msg;
+  g_regex_unref(emoji_regex);
+
+  GRegex *cregex = g_regex_new("<#(\\d+)>", 0, 0, NULL);
+  gchar *fmsg = g_regex_replace_eval(cregex, msg, -1, 0, 0,
+                                     discord_replace_channel,
+                                     ic->proto_data, NULL);
+  g_regex_unref(cregex);
+
+  if (cinfo->type == CHANNEL_PRIVATE) {
+    posted = discord_post_message(cinfo, cinfo->to.handle.name, fmsg, is_self, tstamp);
+  } else if (cinfo->type == CHANNEL_TEXT || cinfo->type == CHANNEL_GROUP_PRIVATE) {
+    posted = discord_post_message(cinfo, author, fmsg, is_self, tstamp);
+  }
+  g_free(fmsg);
 
   json_value *attachments = json_o_get(minfo, "attachments");
   if (attachments != NULL && attachments->type == json_array) {
