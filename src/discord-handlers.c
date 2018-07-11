@@ -696,8 +696,8 @@ static gboolean discord_prepare_message(struct im_connection *ic,
     posted = discord_post_message(cinfo, cinfo->to.handle.name, fmsg, is_self, tstamp);
   } else if (cinfo->type == CHANNEL_TEXT || cinfo->type == CHANNEL_GROUP_PRIVATE) {
     posted = discord_post_message(cinfo, author, fmsg, is_self, tstamp);
-    g_free(fmsg);
   }
+  g_free(fmsg);
 
   json_value *attachments = json_o_get(minfo, "attachments");
   if (attachments != NULL && attachments->type == json_array) {
