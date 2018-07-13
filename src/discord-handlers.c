@@ -144,7 +144,7 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
       bee_user_t *bu = bee_user_by_handle(ic->bee, ic, name);
 
       if (bu == NULL) {
-        imcb_add_buddy(ic, name, NULL);
+        bu = bee_user_new(ic->bee, ic, name, 0);
         if (set_getbool(&ic->acc->set, "never_offline") == TRUE) {
           flags = BEE_USER_ONLINE | BEE_USER_AWAY;
           if (set_getbool(&ic->acc->set, "friendship_mode") == FALSE) {
@@ -153,7 +153,6 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
         } else {
           imcb_buddy_status(ic, name, 0, NULL, NULL);
         }
-        bu = bee_user_by_handle(ic->bee, ic, name);
       }
 
       if (bu != NULL) {
