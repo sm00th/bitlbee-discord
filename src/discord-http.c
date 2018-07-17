@@ -317,7 +317,12 @@ static void discord_http_send_msg_cb(struct http_request *req)
 
   if (req->status_code != 200) {
     if (discord_http_check_retry(req) == 0) {
-      imcb_error(ic, "Failed to send message (%d).", req->status_code);
+      char *json_text = strstr(req->request, "{\"content\":\"");
+      json_value *js = json_parse(json_text, strlen(json_text));
+      const char *message = json_o_str(js, "content");
+      
+      imcb_error(ic, "Failed to send message (%d; %s).", req->status_code, message);
+      json_value_free(js);
     }
   }
 }
