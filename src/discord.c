@@ -90,6 +90,7 @@ static void discord_init(account_t *acc)
   s = set_add(&acc->set, "incoming_me_translation", "on", set_eval_bool, acc);
   s = set_add(&acc->set, "fetch_pinned", "off", set_eval_bool, acc);
   s = set_add(&acc->set, "always_afk", "off", set_eval_bool, acc);
+  s = set_add(&acc->set, "emoji_urls", "on", set_eval_bool, acc);
 
   s = set_add(&acc->set, "auto_join", "off", set_eval_bool, acc);
   s->flags |= ACC_SET_OFFLINE_ONLY;

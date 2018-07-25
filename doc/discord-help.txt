@@ -97,3 +97,7 @@ For instance, "Foo.*,Bar.A" will exclude all channels from server "Foo" and chan
 always_afk (type: boolean; default: off)
 When enabled bitlbee-discord would always report client's status as afk.  This feature is not properly documented in official docs, but it presumably can force push notifications to other clients when bitlbee is connected.
 %
+?emoji_urls
+emoji_urls (type: boolean; default: on)
+Controls whether bitlbee-discord would display an url to emoji image next to it's text alias.
+%

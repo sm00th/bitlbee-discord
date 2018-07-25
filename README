@@ -170,6 +170,10 @@ This section describes options available through "account set" bitlbee command
     This feature is not properly documented in official docs, but it presumably
     can force push notifications to other clients when bitlbee is connected.
 
+  - emoji_urls (type: boolean; default: on)
+    Controls whether bitlbee-discord would display an url to emoji image next
+    to it's text alias.
+
 Debugging
 ---------
 You can enable extra debug output for bitlbee-discord, by setting BITLBEE_DEBUG
