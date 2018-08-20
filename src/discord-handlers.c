@@ -1,4 +1,3 @@
-    json_value *uinfo = json_o_get(rinfo, "user");
 /*
  * Copyright 2015-2016 Artem Savkov <artem.savkov@gmail.com>
  *
@@ -192,18 +191,19 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
   discord_data *dd = ic->proto_data;
   relationship_type rtype = 0;
   char *name = NULL;
-  json_value *uinfo = NULL;
+  bee_user_t *bu = NULL;
 
   if(action == ACTION_DELETE) {
     user_info *uinf = get_user(dd, json_o_str(rinfo, "id"), NULL, SEARCH_ID);
     name = discord_canonize_name(uinf->name);
+    bu = uinf->user
   } else {
-    uinfo = json_o_get(rinfo, "user");
+    json_value *uinfo = json_o_get(rinfo, "user");
     name = discord_canonize_name(json_o_str(uinfo, "username"));
+    bu = bee_user_by_handle(ic->bee, ic, name);
   }
   json_value *tjs = json_o_get(rinfo, "type");
-  bee_user_t *bu = bee_user_by_handle(ic->bee, ic, name);
-
+  
   if (action == ACTION_CREATE) {
     rtype = (tjs && tjs->type == json_integer) ? tjs->u.integer : 0;
 
