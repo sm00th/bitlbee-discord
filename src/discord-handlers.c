@@ -190,9 +190,17 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
 {
   discord_data *dd = ic->proto_data;
   relationship_type rtype = 0;
-  json_value *uinfo = json_o_get(rinfo, "user");
+  char *name = NULL;
+  json_value *uinfo = NULL;
+
+  if(action == ACTION_DELETE) {
+    user_info *uinf = get_user(dd, json_o_str(rinfo, "id"), NULL, SEARCH_ID);
+    name = discord_canonize_name(uinf->name);
+  } else {
+    uinfo = json_o_get(rinfo, "user");
+    name = discord_canonize_name(json_o_str(uinfo, "username"));
+  }
   json_value *tjs = json_o_get(rinfo, "type");
-  char *name = discord_canonize_name(json_o_str(uinfo, "username"));
   bee_user_t *bu = bee_user_by_handle(ic->bee, ic, name);
 
   if (action == ACTION_CREATE) {
