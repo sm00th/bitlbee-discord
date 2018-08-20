@@ -1,3 +1,4 @@
+    json_value *uinfo = json_o_get(rinfo, "user");
 /*
  * Copyright 2015-2016 Artem Savkov <artem.savkov@gmail.com>
  *
