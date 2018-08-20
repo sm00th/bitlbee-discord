@@ -191,6 +191,7 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
   discord_data *dd = ic->proto_data;
   relationship_type rtype = 0;
   char *name = NULL;
+  json_value *uinfo = NULL;
   bee_user_t *bu = NULL;
 
   if(action == ACTION_DELETE) {
@@ -198,7 +199,7 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
     name = discord_canonize_name(uinf->name);
     bu = uinf->user;
   } else {
-    json_value *uinfo = json_o_get(rinfo, "user");
+    uinfo = json_o_get(rinfo, "user");
     name = discord_canonize_name(json_o_str(uinfo, "username"));
     bu = bee_user_by_handle(ic->bee, ic, name);
   }
