@@ -196,7 +196,7 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
   if(action == ACTION_DELETE) {
     user_info *uinf = get_user(dd, json_o_str(rinfo, "id"), NULL, SEARCH_ID);
     name = discord_canonize_name(uinf->name);
-    bu = uinf->user
+    bu = uinf->user;
   } else {
     json_value *uinfo = json_o_get(rinfo, "user");
     name = discord_canonize_name(json_o_str(uinfo, "username"));
