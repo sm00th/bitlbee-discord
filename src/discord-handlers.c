@@ -193,6 +193,7 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
   char *name = NULL;
   json_value *uinfo = NULL;
   bee_user_t *bu = NULL;
+  user_info *uinf = NULL;
   json_value *tjs = json_o_get(rinfo, "type");
 
   if (action == ACTION_CREATE) {
@@ -209,7 +210,7 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
       if (bu) {
         bu->data = GINT_TO_POINTER(TRUE);
         if (set_getbool(&ic->acc->set, "friendship_mode") == TRUE) {
-          user_info *uinf = get_user(dd, name, NULL, SEARCH_NAME);
+          uinf = get_user(dd, name, NULL, SEARCH_NAME);
           imcb_buddy_status(ic, name, uinf->flags, NULL, NULL);
         }
       }
@@ -218,17 +219,17 @@ static void discord_handle_relationship(struct im_connection *ic, json_value *ri
     }
 
   } else if (action == ACTION_DELETE) {
-    user_info *uinf = get_user(dd, json_o_str(rinfo, "id"), NULL, SEARCH_ID);
-    name = g_strdup(uinf->name);
-    bu = uinf->user;
-    if (bu) {
+    uinf =  get_user(dd, json_o_str(rinfo, "id"), NULL, SEARCH_ID);
+    
+    if (uinf && uinf->user) {
+      bu = uinf->user;
+      name = g_strdup(uinf->name);
       bu->data = GINT_TO_POINTER(FALSE);
       if (set_getbool(&ic->acc->set, "friendship_mode") == TRUE) {
         imcb_buddy_status(ic, name, 0, NULL, NULL);
       }
     }
   }
-
   g_free(name);
 }
 
