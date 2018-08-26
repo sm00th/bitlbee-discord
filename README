@@ -174,6 +174,16 @@ This section describes options available through "account set" bitlbee command
     Controls whether bitlbee-discord would display an url to emoji image next
     to it's text alias.
 
+  - auto_join (type: boolean; default: off)
+    Automatically join all of the server's channels so you don't have to add
+    them manually (no "chat add" needed).
+
+  - auto_join_exclude (type: string; default: "")
+    Comma-separated list of channel patterns to exclude when auto-joining
+    channels. * matches any text, ? matches a single character.  For instance,
+    "Foo.*,Bar.A" will exclude all channels from server "Foo" and channel "A"
+    from server "Bar".
+
 Debugging
 ---------
 You can enable extra debug output for bitlbee-discord, by setting BITLBEE_DEBUG
