@@ -145,6 +145,7 @@ static void discord_handle_user(struct im_connection *ic, json_value *uinfo,
 
       if (bu == NULL) {
         imcb_add_buddy(ic, name, NULL);
+        imcb_rename_buddy(ic, name, json_o_str(uinfo, "username"));
         if (set_getbool(&ic->acc->set, "never_offline") == TRUE) {
           flags = BEE_USER_ONLINE | BEE_USER_AWAY;
           if (set_getbool(&ic->acc->set, "friendship_mode") == FALSE) {
