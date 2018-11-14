@@ -181,12 +181,17 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
 
   if (dd->state == WS_CONNECTING) {
     gchar buf[4096] = "";
-    ssl_read(dd->ssl, buf, sizeof(buf));
+    if (ssl_read(dd->ssl, buf, sizeof(buf)) < 1) {
+      imcb_error(ic, "Failed to do ssl_read while switching to websocket mode");
+      imc_logout(ic, TRUE);
+      return FALSE;
+    }
     if (g_strrstr_len(buf, 25, "101 Switching") != NULL && \
         g_str_has_suffix(buf, "\r\n\r\n")) {
       dd->state = WS_CONNECTED;
       discord_ws_callback_on_writable(ic);
     } else {
+      discord_debug("<<< (%s) %s switching failure. buf:\n%s\n", dd->uname, __func__, buf);
       imcb_error(ic, "Failed to switch to websocket mode");
       imc_logout(ic, TRUE);
       return FALSE;
