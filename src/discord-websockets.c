@@ -182,7 +182,9 @@ static gboolean discord_ws_in_cb(gpointer data, int source,
   if (dd->state == WS_CONNECTING) {
     gchar buf[4096] = "";
     if (ssl_read(dd->ssl, buf, sizeof(buf)) < 1) {
-      imcb_error(ic, "Failed to do ssl_read while switching to websocket mode");
+      if (ssl_errno == SSL_AGAIN)
+        return TRUE;
+      imcb_error(ic, "Failed to do ssl_read while switching to websocket mode: %d", ssl_errno);
       imc_logout(ic, TRUE);
       return FALSE;
     }
