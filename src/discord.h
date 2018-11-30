@@ -58,7 +58,6 @@ typedef struct _discord_data {
   char       *id;
   char       *session_id;
   char       *uname;
-  char       *nonce;
   gw_data    *gateway;
   GSList     *servers;
   GSList     *pchannels;
