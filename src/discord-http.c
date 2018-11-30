@@ -527,7 +527,8 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
     emsg = nmsg;
   }
 
-  g_string_printf(content, "{\"content\":\"%s\"}", emsg);
+  g_string_printf(content, "{\"content\":\"%s\", \"nonce\":\"%s\"}",
+                  emsg, dd->nonce);
   g_free(emsg);
   g_string_printf(request, "POST /api/channels/%s/messages HTTP/1.1\r\n"
                   "Host: %s\r\n"
