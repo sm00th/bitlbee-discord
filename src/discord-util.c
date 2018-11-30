@@ -113,6 +113,7 @@ static void free_pending_ev(gpointer *ev)
 
 void free_discord_data(discord_data *dd)
 {
+  g_hash_table_destroy(dd->sent_message_ids);
   g_slist_free_full(dd->pending_events, (GDestroyNotify)free_pending_ev);
   g_slist_free_full(dd->pending_reqs, (GDestroyNotify)free_pending_req);
   g_slist_free_full(dd->pchannels, (GDestroyNotify)free_channel_info);

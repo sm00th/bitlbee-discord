@@ -527,8 +527,15 @@ void discord_http_send_msg(struct im_connection *ic, const char *id,
     emsg = nmsg;
   }
 
+  gchar *nonce;
+  guchar nonce_bytes[16];
+
+  random_bytes(nonce_bytes, sizeof(nonce_bytes));
+  nonce = g_base64_encode(nonce_bytes, sizeof(nonce_bytes));
+  g_hash_table_insert(dd->sent_message_ids, nonce,
+      GUINT_TO_POINTER((guint)time(NULL)));
   g_string_printf(content, "{\"content\":\"%s\", \"nonce\":\"%s\"}",
-                  emsg, dd->nonce);
+                  emsg, nonce);
   g_free(emsg);
   g_string_printf(request, "POST /api/channels/%s/messages HTTP/1.1\r\n"
                   "Host: %s\r\n"

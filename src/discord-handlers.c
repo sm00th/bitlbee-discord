@@ -615,7 +615,7 @@ static gboolean discord_prepare_message(struct im_connection *ic,
   time_t tstamp = use_tstamp ? parse_iso_8601(json_o_str(minfo, "timestamp")) : 0;
 
   // Don't echo self messages that we sent in this session
-  if (is_self && nonce != NULL && g_strcmp0(nonce, dd->nonce) == 0) {
+  if (is_self && nonce != NULL && g_hash_table_remove(dd->sent_message_ids, nonce)) {
     g_free(author);
     g_free(msg);
     return FALSE;

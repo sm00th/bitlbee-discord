@@ -54,30 +54,31 @@ typedef struct _gw_data {
 } gw_data;
 
 typedef struct _discord_data {
-  char     *token;
-  char     *id;
-  char     *session_id;
-  char     *uname;
-  char     *nonce;
-  gw_data  *gateway;
-  GSList   *servers;
-  GSList   *pchannels;
-  gint     main_loop_id;
-  GString  *ws_buf;
-  ws_state state;
-  gint     keepalive_interval;
-  gint     keepalive_loop_id;
-  gint     heartbeat_timeout_id;
-  gint     status_timeout_id;
-  void     *ssl;
-  int      sslfd;
-  gint     inpa;
-  gint     wsid;
-  guint64  seq;
-  guint    pending_sync;
-  GSList   *pending_reqs;
-  GSList   *pending_events;
-  gboolean reconnecting;
+  char       *token;
+  char       *id;
+  char       *session_id;
+  char       *uname;
+  char       *nonce;
+  gw_data    *gateway;
+  GSList     *servers;
+  GSList     *pchannels;
+  gint       main_loop_id;
+  GString    *ws_buf;
+  ws_state   state;
+  gint       keepalive_interval;
+  gint       keepalive_loop_id;
+  gint       heartbeat_timeout_id;
+  gint       status_timeout_id;
+  void       *ssl;
+  int        sslfd;
+  gint       inpa;
+  gint       wsid;
+  guint64    seq;
+  guint      pending_sync;
+  GSList     *pending_reqs;
+  GSList     *pending_events;
+  gboolean   reconnecting;
+  GHashTable *sent_message_ids;
 } discord_data;
 
 typedef struct _server_info {

@@ -133,6 +133,8 @@ static void discord_login(account_t *acc)
   struct im_connection *ic = imcb_new(acc);
 
   discord_data *dd = g_new0(discord_data, 1);
+  dd->sent_message_ids = g_hash_table_new_full(g_str_hash, g_str_equal,
+                            g_free, NULL);
   dd->keepalive_interval = DEFAULT_KEEPALIVE_INTERVAL;
   ic->proto_data = dd;
 
