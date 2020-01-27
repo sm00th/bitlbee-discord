@@ -23,9 +23,10 @@ discord_la_CFLAGS  = \
 	-std=c99
 
 discord_la_LDFLAGS = \
+	$(BITLBEE_LIBS) \
+	$(GLIB_LIBS) \
 	-module \
-	-avoid-version \
-	$(GLIB_LIBS)
+	-avoid-version
 
 discord_la_SOURCES = \
 	discord.c \
