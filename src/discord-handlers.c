@@ -880,10 +880,10 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
           discord_handle_server(ic, ginfo, ACTION_CREATE);
         }
       }
-    } else {
-      dd->state = WS_READY;
-      imcb_connected(ic);
     }
+
+    dd->state = WS_READY;
+    imcb_connected(ic);
 
     json_value *pcs = json_o_get(data, "private_channels");
     if (pcs != NULL && pcs->type == json_array) {
