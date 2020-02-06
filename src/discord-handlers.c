@@ -800,6 +800,28 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
   }
 }
 
+static void parse_list_update_item(struct im_connection *ic,
+                                   const char *guild_id, const char *op,
+                                   json_value *item)
+{
+  discord_data *dd = ic->proto_data;
+  json_value *member = json_o_get(item, "member");
+  json_value *uinfo = json_o_get(member, "user");
+  json_value *pinfo = json_o_get(member, "presence");
+
+  if (g_strcmp0(op, "DELETE") == 0) {
+    discord_handle_user(ic, uinfo, guild_id, ACTION_DELETE);
+  } else {
+    user_info *user = get_user(dd, json_o_str(uinfo, "id"), guild_id,
+                               SEARCH_ID);
+    if (user == NULL) {
+      discord_handle_user(ic, uinfo, guild_id, ACTION_CREATE);
+    }
+
+    discord_handle_presence(ic, pinfo, guild_id);
+  }
+}
+
 gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 size)
 {
   discord_data *dd = ic->proto_data;
@@ -942,6 +964,33 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
       for (int pidx = 0; pidx < presences->u.array.length; pidx++) {
         json_value *pinfo = presences->u.array.values[pidx];
         discord_handle_presence(ic, pinfo, id);
+      }
+    }
+  } else if (g_strcmp0(event, "GUILD_MEMBER_LIST_UPDATE") == 0) {
+    json_value *data = json_o_get(js, "d");
+    json_value *ops = json_o_get(data, "ops");
+    const char *guild_id = json_o_str(data, "guild_id");
+
+    if (ops != NULL && ops->type == json_array) {
+      for (int oidx = 0; oidx < ops->u.array.length; oidx++) {
+        const char *op = json_o_str(ops->u.array.values[oidx], "op");
+
+        if (g_strcmp0(op, "SYNC") == 0) {
+          json_value *items = json_o_get(ops->u.array.values[oidx], "items");
+          if (items != NULL && items->type == json_array) {
+            for (int iidx = 0; iidx < items->u.array.length; iidx++) {
+              json_value *item = items->u.array.values[iidx];
+              if (item != NULL && json_o_get(item, "member") != NULL) {
+                parse_list_update_item(ic, guild_id, op, item);
+              }
+            }
+          }
+        } else {
+          json_value *item = json_o_get(ops->u.array.values[oidx], "item");
+          if (item != NULL && json_o_get(item, "member") != NULL) {
+            parse_list_update_item(ic, guild_id, op, item);
+          }
+        }
       }
     }
   } else if (g_strcmp0(event, "VOICE_STATE_UPDATE") == 0) {

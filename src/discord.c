@@ -195,6 +195,7 @@ struct groupchat *discord_chat_do_join(struct im_connection *ic,
   if (cinfo != NULL && cinfo->type == CHANNEL_TEXT) {
     sinfo = cinfo->to.channel.sinfo;
     gc = imcb_chat_new(ic, cinfo->to.channel.name);
+    discord_ws_sync_channel(dd, sinfo->id, cinfo->id, 0);
 
     if (is_auto_join) {
       imcb_chat_name_hint(gc, room);

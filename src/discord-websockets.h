@@ -29,7 +29,9 @@ typedef enum {
   OPCODE_INVALID_SESSION,
   OPCODE_HELLO,
   OPCODE_HEARTBEAT_ACK,
-  OPCODE_REQUEST_SYNC
+  OPCODE_REQUEST_SYNC,
+  OPCODE_UNKNOWN,
+  OPCODE_REQUEST_SYNC_CHANNEL
 } discord_opcode;
 
 gboolean discord_ws_keepalive_loop(gpointer data, gint fd,
@@ -40,3 +42,5 @@ void discord_ws_cleanup(discord_data *dd);
 void discord_ws_set_status(struct im_connection *ic, gchar *status,
     gchar *message);
 void discord_ws_sync_server(discord_data *dd, const char *id);
+void discord_ws_sync_channel(discord_data *dd, const char *guild_id,
+                             const char *channel_id, unsigned int members);

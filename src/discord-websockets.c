@@ -98,6 +98,16 @@ void discord_ws_sync_server(discord_data *dd, const char *id)
   g_string_free(buf, TRUE);
 }
 
+void discord_ws_sync_channel(discord_data *dd, const char *guild_id,
+                             const char *channel_id, unsigned int members)
+{
+  GString *buf = g_string_new("");
+  g_string_printf(buf, "{\"op\":%d,\"d\":{\"guild_id\":\"%s\",\"typing\":true,\"activities\":true,\"channels\":{\"%s\":[[0,%u]]}}}",
+                  OPCODE_REQUEST_SYNC_CHANNEL, guild_id, channel_id, members);
+  discord_ws_send_payload(dd, buf->str, buf->len);
+  g_string_free(buf, TRUE);
+}
+
 static gboolean discord_ws_heartbeat_timeout(gpointer data, gint fd,
                                              b_input_condition cond)
 {
