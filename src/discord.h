@@ -73,7 +73,6 @@ typedef struct _discord_data {
   gint       inpa;
   gint       wsid;
   guint64    seq;
-  guint      pending_sync;
   GSList     *pending_reqs;
   GSList     *pending_events;
   gboolean   reconnecting;

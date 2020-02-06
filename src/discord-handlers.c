@@ -521,9 +521,6 @@ static void discord_handle_server(struct im_connection *ic, json_value *sinfo,
         discord_handle_voice_state(ic, vsinfo, sdata->id);
       }
     }
-
-    discord_ws_sync_server(dd, sdata->id);
-    dd->pending_sync++;
   } else {
     server_info *sdata = get_server_by_id(dd, id);
     if (sdata == NULL) {
@@ -742,7 +739,7 @@ void discord_handle_message(struct im_connection *ic, json_value *minfo,
   if (cinfo == NULL) {
     return;
   }
-  
+
   time_t tstamp = use_tstamp ? parse_iso_8601(json_o_str(minfo, "timestamp")) : 0;
 
   if (action == ACTION_CREATE) {
@@ -946,12 +943,6 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
         json_value *pinfo = presences->u.array.values[pidx];
         discord_handle_presence(ic, pinfo, id);
       }
-    }
-
-    dd->pending_sync--;
-    if (dd->pending_sync < 1 && dd->state == WS_ALMOST_READY) {
-      dd->state = WS_READY;
-      imcb_connected(ic);
     }
   } else if (g_strcmp0(event, "VOICE_STATE_UPDATE") == 0) {
     json_value *vsinfo = json_o_get(js, "d");
