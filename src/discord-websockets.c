@@ -108,6 +108,15 @@ void discord_ws_sync_channel(discord_data *dd, const char *guild_id,
   g_string_free(buf, TRUE);
 }
 
+void discord_ws_sync_private_group(discord_data *dd, const char *channel_id)
+{
+  GString *buf = g_string_new("");
+  g_string_printf(buf, "{\"op\":%d,\"d\":{\"channel_id\":\"%s\"}}",
+                  OPCODE_REQUEST_SYNC_PRIVATE_GROUP, channel_id);
+  discord_ws_send_payload(dd, buf->str, buf->len);
+  g_string_free(buf, TRUE);
+}
+
 static gboolean discord_ws_heartbeat_timeout(gpointer data, gint fd,
                                              b_input_condition cond)
 {

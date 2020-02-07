@@ -217,6 +217,7 @@ struct groupchat *discord_chat_do_join(struct im_connection *ic,
   } else if (cinfo != NULL && cinfo->type == CHANNEL_GROUP_PRIVATE) {
     gc = imcb_chat_new(ic, cinfo->to.group.name);
 
+    discord_ws_sync_private_group(dd, cinfo->id);
     if (is_auto_join) {
       imcb_chat_name_hint(gc, room);
     }

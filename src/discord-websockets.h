@@ -30,7 +30,7 @@ typedef enum {
   OPCODE_HELLO,
   OPCODE_HEARTBEAT_ACK,
   OPCODE_REQUEST_SYNC,
-  OPCODE_UNKNOWN,
+  OPCODE_REQUEST_SYNC_PRIVATE_GROUP,
   OPCODE_REQUEST_SYNC_CHANNEL
 } discord_opcode;
 
@@ -44,3 +44,4 @@ void discord_ws_set_status(struct im_connection *ic, gchar *status,
 void discord_ws_sync_server(discord_data *dd, const char *id);
 void discord_ws_sync_channel(discord_data *dd, const char *guild_id,
                              const char *channel_id, unsigned int members);
+void discord_ws_sync_private_group(discord_data *dd, const char *channel_id);
