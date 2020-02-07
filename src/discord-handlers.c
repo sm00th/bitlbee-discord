@@ -901,9 +901,6 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
       }
     }
 
-    dd->state = WS_READY;
-    imcb_connected(ic);
-
     json_value *pcs = json_o_get(data, "private_channels");
     if (pcs != NULL && pcs->type == json_array) {
       for (int pcidx = 0; pcidx < pcs->u.array.length; pcidx++) {
@@ -945,6 +942,9 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
         }
       }
     }
+
+    dd->state = WS_READY;
+    imcb_connected(ic);
 
   } else if (g_strcmp0(event, "GUILD_SYNC") == 0) {
     json_value *data = json_o_get(js, "d");
