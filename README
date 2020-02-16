@@ -65,7 +65,7 @@ On your first login you might need to authorize bitlbee's ip address
 (discord will send you an email with a link) or get a captcha-request. In
 latter case you will have to manually set discord login-token to log in:
 
-  > account off discord
+  > account discord off
   > acc discord set token_cache xxxxxxxx
 
 To get your token you'll have to login with your browser and locate it in
