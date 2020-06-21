@@ -121,7 +121,9 @@ static gboolean discord_ws_heartbeat_timeout(gpointer data, gint fd,
                                              b_input_condition cond)
 {
   struct im_connection *ic = data;
-  imcb_log(ic, "Heartbeat timed out, reconnecting...");
+  if (set_getbool(&ic->acc->set, "verbose")) {
+    imcb_log(ic, "Heartbeat timed out, reconnecting...");
+  }
   discord_soft_reconnect(ic);
   return FALSE;
 }

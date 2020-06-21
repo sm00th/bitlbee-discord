@@ -113,6 +113,8 @@ static void discord_init(account_t *acc)
   s = set_add(&acc->set, "friendship_mode", "on", set_eval_bool, acc);
   s->flags |= ACC_SET_OFFLINE_ONLY;
 
+  s = set_add(&acc->set, "verbose", "off", set_eval_bool, acc);
+
   acc->flags |= ACC_FLAG_AWAY_MESSAGE;
   acc->flags |= ACC_FLAG_STATUS_MESSAGE;
 
@@ -155,7 +157,9 @@ void discord_soft_reconnect(struct im_connection *ic)
 {
   discord_data *dd = ic->proto_data;
 
-  imcb_log(ic, "Performing soft-reconnect");
+  if (set_getbool(&ic->acc->set, "verbose")) {
+    imcb_log(ic, "Performing soft-reconnect");
+  }
   discord_ws_cleanup(dd);
   dd->reconnecting = TRUE;
   discord_do_login(ic);

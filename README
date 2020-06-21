@@ -184,6 +184,9 @@ This section describes options available through "account set" bitlbee command
     "Foo.*,Bar.A" will exclude all channels from server "Foo" and channel "A"
     from server "Bar".
 
+  - verbose (type: boolean; default: off)
+    Show more protocol-related messages in control channel.
+
 Debugging
 ---------
 You can enable extra debug output for bitlbee-discord, by setting BITLBEE_DEBUG

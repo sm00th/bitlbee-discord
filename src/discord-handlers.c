@@ -868,7 +868,9 @@ gboolean discord_parse_message(struct im_connection *ic, gchar *buf, guint64 siz
       dd->heartbeat_timeout_id = 0;
     }
   } else if (op == OPCODE_RECONNECT) {
-    imcb_log(ic, "Reconnect requested");
+    if (set_getbool(&ic->acc->set, "verbose")) {
+      imcb_log(ic, "Reconnect requested");
+    }
     discord_soft_reconnect(ic);
   } else if (op == OPCODE_INVALID_SESSION) {
     imcb_error(ic, "Invalid session, reconnecting");
