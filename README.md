@@ -1,4 +1,5 @@
 Discord protocol plugin for bitlbee.
+====================================
 
 License
 -------
@@ -38,13 +39,13 @@ Building and Installing
 If building from git you will first need to generate autotools configuration
 script and related files by executing the following command:
 
-  $ ./autogen.sh
+    $ ./autogen.sh
 
 After that (or when building from a tarball) you can build as usual:
 
-  $ ./configure
-  $ make
-  $ sudo make install
+    $ ./configure
+    $ make
+    $ sudo make install
 
 If your bitlbee's plugindir is in non-standard location you can specify it by
 calling ./configure with --with-plugindir=/path/to/plugindir option.
@@ -52,7 +53,7 @@ calling ./configure with --with-plugindir=/path/to/plugindir option.
 You can also use the dockerfile from contrib/docker to build a docker container
 containing bitlbee + bitlbee-discord. Use this command to run the container:
 
-  $ docker run -d -v /bitlbee/config:/var/lib/bitlbee -p 6667:6667 --name bitlbee <image>
+    $ docker run -d -v /bitlbee/config:/var/lib/bitlbee -p 6667:6667 --name bitlbee <image>
 
 Usage
 -----
@@ -193,7 +194,9 @@ You can enable extra debug output for bitlbee-discord, by setting BITLBEE_DEBUG
 environment variable. This will enable bitlbee-discord to print all traffic it
 exchanges with discord servers to stdout and there is a lot of it. To get it
 on your screen run bitlbee by hand in foreground mode:
-  $ BITLBEE_DEBUG=1 bitlbee -nvD
+
+    $ BITLBEE_DEBUG=1 bitlbee -nvD
+    
 then connect with an irc client as you usually do.
 
 WARNING: there IS sensitive information in this debug output, such as auth
