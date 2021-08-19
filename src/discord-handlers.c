@@ -601,6 +601,7 @@ static gboolean discord_prepare_message(struct im_connection *ic,
   gboolean posted = FALSE;
   gchar *msg = json_o_strdup(minfo, "content");
   json_value *jpinned = json_o_get(minfo, "pinned");
+  json_value *ref = json_o_get(minfo, "referenced_message");
   gboolean pinned = (jpinned != NULL && jpinned->type == json_boolean) ?
                        jpinned->u.boolean : FALSE;
 
@@ -616,6 +617,16 @@ static gboolean discord_prepare_message(struct im_connection *ic,
     g_free(author);
     g_free(msg);
     return FALSE;
+  }
+
+  if (ref != NULL && ref->type == json_object) {
+    gchar *rauthor = discord_canonize_name(json_o_str(json_o_get(ref,
+            "author"), "username"));
+    gchar *rmsg = g_strdup_printf("IN_REPLY_TO: %s> %.50s...", rauthor,
+        json_o_str(ref, "content"));
+    posted = discord_post_message(cinfo, author, rmsg, is_self, tstamp);
+    g_free(rmsg);
+    g_free(rauthor);
   }
 
   if (pinned == TRUE) {
