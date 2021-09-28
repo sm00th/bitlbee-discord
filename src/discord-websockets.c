@@ -360,6 +360,8 @@ static gboolean discord_ws_connected_cb(gpointer data, int retcode,
 
   g_free(bkey);
 
+  discord_debug(">>> (%s) %s %"G_GSIZE_FORMAT"\n%s\n", dd->uname, __func__, req->len, req->str);
+
   dd->sslfd = ssl_getfd(source);
   dd->inpa = b_input_add(dd->sslfd, B_EV_IO_READ, discord_ws_in_cb, ic);
   ssl_write(dd->ssl, req->str, req->len);
