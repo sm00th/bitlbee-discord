@@ -445,7 +445,11 @@ void discord_ws_set_status(struct im_connection *ic, gchar *status,
     msg = discord_escape_string(message);
   }
   if (status != NULL) {
-    stat = discord_escape_string(status);
+    // HACK: Discord requires lowercase 'status' states
+    // Bitlbee's alias matching currently gives "DND" for "Busy", so lowercase it
+    gchar *status_lower = g_ascii_strdown(status, -1);
+    stat = discord_escape_string(status_lower);
+    g_free(status_lower);
   }
 
   if (status != NULL) {
